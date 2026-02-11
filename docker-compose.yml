@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: sph-postgres
+    environment:
+      POSTGRES_USER: sph_user
+      POSTGRES_PASSWORD: sph_password
+      POSTGRES_DB: sph_system
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sph_user -d sph_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sph-backend
+    environment:
+      # Base de datos
+      DATABASE_URL: postgresql://sph_user:sph_password@db:5432/sph_system
+      
+      # Configuración de la aplicación
+      PROJECT_NAME: "Sistema de Planificación de Horarios"
+      VERSION: "1.0.0"
+      API_V1_STR: "/api/v1"
+      
+      # Seguridad (CAMBIAR EN PRODUCCIÓN)
+      SECRET_KEY: "tu-clave-secreta-super-segura-cambiar-en-produccion"
+      ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      
+      # CORS
+      BACKEND_CORS_ORIGINS: '["http://localhost:3000","http://localhost:4321"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo '⏳ Esperando a que la base de datos esté lista...' &&
+        sleep 5 &&
+        echo '🔄 Ejecutando migraciones de Alembic...' &&
+        alembic upgrade head &&
+        echo '✅ Migraciones completadas' &&
+        echo '🚀 Iniciando servidor FastAPI...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+volumes:
+  postgres_data:
+    name: sph_postgres_data

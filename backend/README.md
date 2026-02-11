@@ -92,6 +92,47 @@ start.bat
 
 ---
 
+## Docker
+
+### Iniciar con Docker Compose
+
+Desde la raíz del proyecto:
+
+```bash
+docker-compose up -d
+```
+
+Esto iniciará:
+- PostgreSQL en puerto 5432
+- Backend en puerto 8000
+
+### Comandos útiles
+
+```bash
+# Ver logs
+docker-compose logs -f backend
+
+# Detener servicios
+docker-compose down
+
+# Reconstruir imágenes
+docker-compose up -d --build
+
+# Ejecutar migraciones manualmente
+docker-compose exec backend alembic upgrade head
+
+# Ejecutar seed de datos
+docker-compose exec backend python seed.py
+```
+
+### Acceder a la base de datos
+
+```bash
+docker-compose exec db psql -U sph_user -d sph_system
+```
+
+---
+
 ## Equipo
 
 - Cesar Arath Angeles Pérez
