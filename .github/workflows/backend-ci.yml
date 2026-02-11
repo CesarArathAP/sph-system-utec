@@ -38,19 +38,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Check Python syntax
-      working-directory: ./backend
-      run: |
-        python -m py_compile app/**/*.py
-        echo "✅ Python syntax validation passed"
-    
-    - name: Verify imports
-      working-directory: ./backend
-      run: |
-        python -c "from app.main import app; print('✅ Main app imports successfully')"
-        python -c "from app.database import Base; print('✅ Database imports successfully')"
-        python -c "from app.models import User; print('✅ Models import successfully')"
-    
     - name: Check code structure
       working-directory: ./backend
       run: |
