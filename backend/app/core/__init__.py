@@ -1,0 +1,3 @@
+"""
+Funcionalidades core del sistema.
+"""
