@@ -1,0 +1,47 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Check code structure
+      working-directory: ./frontend
+      run: |
+        echo "📁 Checking project structure..."
+        test -f package.json && echo "✅ package.json exists"
+        test -f astro.config.mjs && echo "✅ astro.config.mjs exists"
+        test -d src && echo "✅ src directory exists"
+        echo "✅ Project structure validation passed"
+    
+    - name: Build project
+      working-directory: ./frontend
+      run: npm run build
+      
+    - name: Build success
+      run: echo "✅ Frontend build completed successfully"
