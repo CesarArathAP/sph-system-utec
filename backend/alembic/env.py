@@ -16,7 +16,11 @@ from app.config import settings
 from app.database import Base
 
 # Importar todos los modelos aquí para que Alembic los detecte
-# from app.models import usuario, docente, materia, grupo, aula, horario
+from app.models import (
+    User, Docente, DisponibilidadDocente,
+    Materia, Aula, Grupo,
+    Asignacion, Horario, Conflicto
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
