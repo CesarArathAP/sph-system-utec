@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 
-# Importar routers (se agregarán cuando estén implementados)
-# from app.api.routes import auth, docentes, materias, grupos, aulas, horarios
+# Importar routers
+from app.api.routes import auth
 
 
 # Crear tablas en la base de datos
@@ -42,8 +42,8 @@ async def root():
         "docs": "/docs"
     }
 
-# Incluir routers (se descomentarán cuando estén implementados)
-# app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+# Incluir routers
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 # app.include_router(docentes.router, prefix=f"{settings.API_V1_STR}/docentes", tags=["docentes"])
 # app.include_router(materias.router, prefix=f"{settings.API_V1_STR}/materias", tags=["materias"])
 # app.include_router(grupos.router, prefix=f"{settings.API_V1_STR}/grupos", tags=["grupos"])
