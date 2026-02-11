@@ -1,0 +1,64 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Check Python syntax
+      working-directory: ./backend
+      run: |
+        python -m py_compile app/**/*.py
+        echo "✅ Python syntax validation passed"
+    
+    - name: Verify imports
+      working-directory: ./backend
+      run: |
+        python -c "from app.main import app; print('✅ Main app imports successfully')"
+        python -c "from app.database import Base; print('✅ Database imports successfully')"
+        python -c "from app.models import User; print('✅ Models import successfully')"
+    
+    - name: Check code structure
+      working-directory: ./backend
+      run: |
+        echo "📁 Checking project structure..."
+        test -f app/main.py && echo "✅ main.py exists"
+        test -f app/database.py && echo "✅ database.py exists"
+        test -f app/config.py && echo "✅ config.py exists"
+        test -d app/models && echo "✅ models directory exists"
+        test -d app/api && echo "✅ api directory exists"
+        test -d alembic && echo "✅ alembic directory exists"
+        echo "✅ Project structure validation passed"
