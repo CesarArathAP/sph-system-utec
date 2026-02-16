@@ -28,16 +28,24 @@ export default function RegisterForm() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Aquí iría la lógica de registro
-      console.log('Register:', formData);
-      // const response = await fetch('/api/auth/register', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // });
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      localStorage.setItem('user', JSON.stringify({ 
+        email: formData.email, 
+        name: formData.fullName,
+        role: formData.role 
+      }));
+      
+      // Navegar al dashboard
+      window.location.href = '/dashboard';
     } catch (err) {
       setError('Error en el registro');
     } finally {
