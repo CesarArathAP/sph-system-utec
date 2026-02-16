@@ -47,6 +47,18 @@ from app.schemas.asignacion import (
     AsignacionResponse,
     AsignacionListResponse,
 )
+from app.schemas.horario import (
+    HorarioBase,
+    HorarioCreate,
+    HorarioUpdate,
+    HorarioResponse,
+    HorarioListResponse,
+    ConflictoResponse,
+)
+from app.schemas.conflicto import (
+    ConflictoRegistradoResponse,
+    ConflictoListResponse,
+)
 
 __all__ = [
     "UserBase",
@@ -83,5 +95,13 @@ __all__ = [
     "AsignacionUpdate",
     "AsignacionResponse",
     "AsignacionListResponse",
+    "HorarioBase",
+    "HorarioCreate",
+    "HorarioUpdate",
+    "HorarioResponse",
+    "HorarioListResponse",
+    "ConflictoResponse",
+    "ConflictoRegistradoResponse",
+    "ConflictoListResponse",
 ]
 
