@@ -26,6 +26,13 @@ from app.schemas.materia import (
     MateriaResponse,
     MateriaListResponse,
 )
+from app.schemas.grupo import (
+    GrupoBase,
+    GrupoCreate,
+    GrupoUpdate,
+    GrupoResponse,
+    GrupoListResponse,
+)
 
 __all__ = [
     "UserBase",
@@ -47,5 +54,10 @@ __all__ = [
     "MateriaUpdate",
     "MateriaResponse",
     "MateriaListResponse",
+    "GrupoBase",
+    "GrupoCreate",
+    "GrupoUpdate",
+    "GrupoResponse",
+    "GrupoListResponse",
 ]
 
