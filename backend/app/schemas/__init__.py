@@ -9,6 +9,16 @@ from app.schemas.user import (
     Token,
     TokenData,
 )
+from app.schemas.docente import (
+    DocenteBase,
+    DocenteCreate,
+    DocenteUpdate,
+    DocenteResponse,
+    DocenteListResponse,
+    DisponibilidadBase,
+    DisponibilidadCreate,
+    DisponibilidadResponse,
+)
 
 __all__ = [
     "UserBase",
@@ -17,4 +27,13 @@ __all__ = [
     "UserLogin",
     "Token",
     "TokenData",
+    "DocenteBase",
+    "DocenteCreate",
+    "DocenteUpdate",
+    "DocenteResponse",
+    "DocenteListResponse",
+    "DisponibilidadBase",
+    "DisponibilidadCreate",
+    "DisponibilidadResponse",
 ]
+
