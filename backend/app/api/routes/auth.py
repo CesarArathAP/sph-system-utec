@@ -2,6 +2,7 @@
 Rutas de autenticación.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -31,19 +32,20 @@ def register(
 
 @router.post("/login", response_model=Token)
 def login(
-    credentials: UserLogin,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """
     Iniciar sesión y obtener token JWT.
     
-    - **email**: Email del usuario
+    Usa el formulario OAuth2 estándar:
+    - **username**: Email del usuario
     - **password**: Contraseña del usuario
     
     Returns:
         Token JWT para autenticación
     """
-    return auth_service.login_user(db, credentials.email, credentials.password)
+    return auth_service.login_user(db, form_data.username, form_data.password)
 
 
 @router.get("/me", response_model=UserResponse)
