@@ -19,6 +19,13 @@ from app.schemas.docente import (
     DisponibilidadCreate,
     DisponibilidadResponse,
 )
+from app.schemas.materia import (
+    MateriaBase,
+    MateriaCreate,
+    MateriaUpdate,
+    MateriaResponse,
+    MateriaListResponse,
+)
 
 __all__ = [
     "UserBase",
@@ -35,5 +42,10 @@ __all__ = [
     "DisponibilidadBase",
     "DisponibilidadCreate",
     "DisponibilidadResponse",
+    "MateriaBase",
+    "MateriaCreate",
+    "MateriaUpdate",
+    "MateriaResponse",
+    "MateriaListResponse",
 ]
 
