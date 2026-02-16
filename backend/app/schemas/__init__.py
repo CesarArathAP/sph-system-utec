@@ -40,6 +40,13 @@ from app.schemas.aula import (
     AulaResponse,
     AulaListResponse,
 )
+from app.schemas.asignacion import (
+    AsignacionBase,
+    AsignacionCreate,
+    AsignacionUpdate,
+    AsignacionResponse,
+    AsignacionListResponse,
+)
 
 __all__ = [
     "UserBase",
@@ -71,5 +78,10 @@ __all__ = [
     "AulaUpdate",
     "AulaResponse",
     "AulaListResponse",
+    "AsignacionBase",
+    "AsignacionCreate",
+    "AsignacionUpdate",
+    "AsignacionResponse",
+    "AsignacionListResponse",
 ]
 
