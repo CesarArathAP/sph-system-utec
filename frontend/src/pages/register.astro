@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { AuthLayout, RegisterForm } from '../components/Auth';
+---
+
+<BaseLayout title="Crear Cuenta - SPH System">
+	<AuthLayout
+		title="Bienvenido"
+		subtitle="Crear cuenta"
+		imageSrc="/src/assets/images/control-horario.png"
+	>
+		<RegisterForm client:load />
+	</AuthLayout>
+</BaseLayout>
