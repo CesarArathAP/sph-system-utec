@@ -12,13 +12,19 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      // Aquí iría la lógica de autenticación
-      console.log('Login:', { email, password });
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password })
-      // });
+      // Validación básica
+      if (!email || !password) {
+        setError('Por favor completa todos los campos');
+        setLoading(false);
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      localStorage.setItem('user', JSON.stringify({ email, name: 'Usuario' }));
+      
+      // Navegar al dashboard
+      window.location.href = '/dashboard';
     } catch (err) {
       setError('Error en la autenticación');
     } finally {
