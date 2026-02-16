@@ -33,6 +33,13 @@ from app.schemas.grupo import (
     GrupoResponse,
     GrupoListResponse,
 )
+from app.schemas.aula import (
+    AulaBase,
+    AulaCreate,
+    AulaUpdate,
+    AulaResponse,
+    AulaListResponse,
+)
 
 __all__ = [
     "UserBase",
@@ -59,5 +66,10 @@ __all__ = [
     "GrupoUpdate",
     "GrupoResponse",
     "GrupoListResponse",
+    "AulaBase",
+    "AulaCreate",
+    "AulaUpdate",
+    "AulaResponse",
+    "AulaListResponse",
 ]
 
