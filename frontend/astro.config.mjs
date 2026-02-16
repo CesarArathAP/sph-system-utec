@@ -11,5 +11,12 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss()]
+  },
+
+  output: 'static',
+  
+  server: {
+    port: 3000,
+    host: true
   }
 });
