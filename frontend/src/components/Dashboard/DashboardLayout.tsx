@@ -5,6 +5,7 @@ import AssignmentModal from './AssignmentModal';
 import ProfesoresLayout from './ProfesoresLayout';
 import AulasLayout from './AulasLayout';
 import MateriasLayout from './MateriasLayout';
+import GruposLayout from './GruposLayout';
 
 export default function DashboardLayout() {
   const [activeMenu, setActiveMenu] = useState('horario');
@@ -29,6 +30,7 @@ export default function DashboardLayout() {
         {activeMenu === 'profesores' && <ProfesoresLayout />}
         {activeMenu === 'aulas' && <AulasLayout />}
         {activeMenu === 'materias' && <MateriasLayout />}
+        {activeMenu === 'grupos' && <GruposLayout />}
       </main>
 
       {/* Modal */}
