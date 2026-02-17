@@ -35,6 +35,7 @@ class User(Base):
     rol = Column(SQLEnum(RolEnum), nullable=False, index=True)
     activo = Column(Boolean, default=True, nullable=False)
     current_token = Column(String(32), nullable=True, index=True)  # Token de sesión activo
+    token_expires_at = Column(DateTime, nullable=True)  # Fecha de expiración del token
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
