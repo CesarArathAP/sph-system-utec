@@ -10,7 +10,6 @@ export default function Sidebar({ activeMenu, onMenuChange, onLogout }: SidebarP
   const menuItems = [
     { id: 'horario', label: 'Horario' },
     { id: 'profesores', label: 'Profesores' },
-    { id: 'alumnos', label: 'Alumnos' },
     { id: 'materias', label: 'Materias' },
     { id: 'aulas', label: 'Aulas' },
     { id: 'grupos', label: 'Grupos' },
