@@ -16,7 +16,7 @@ export default function MateriasLayout() {
   const [materias, setMaterias] = useState<Materia[]>([
     {
       id: '1',
-      codigo: 'MAT101',
+      codigo: 'ESP101',
       nombre: 'Español',
       creditos: 3,
       horasPorSemana: 4,
@@ -69,7 +69,7 @@ export default function MateriasLayout() {
         <div className="relative">
           <input
             type="text"
-            placeholder="Buscar profesor"
+            placeholder="Buscar materia"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
