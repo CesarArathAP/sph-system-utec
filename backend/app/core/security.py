@@ -43,21 +43,18 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """
-    Crear un token JWT.
+    Crear un token de acceso de 32 caracteres.
     
     Args:
-        data: Datos a incluir en el token
-        expires_delta: Tiempo de expiración del token
+        data: Datos a incluir en el token (se usa user_id)
+        expires_delta: Tiempo de expiración del token (no usado, mantenido por compatibilidad)
         
     Returns:
-        Token JWT codificado
+        Token de 32 caracteres hexadecimales
     """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    import secrets
     
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt
+    # Generar token aleatorio de 32 caracteres (16 bytes en hexadecimal)
+    token = secrets.token_hex(16)
+    
+    return token

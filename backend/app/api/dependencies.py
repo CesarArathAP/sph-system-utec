@@ -15,12 +15,27 @@ from app.schemas.user import TokenData
 security = HTTPBearer()
 
 
+def _get_user_id_from_token(token: str, db: Session) -> int | None:
+    """
+    Obtener el ID del usuario desde un token de 32 caracteres.
+    
+    Args:
+        token: Token de 32 caracteres
+        db: Sesión de base de datos
+        
+    Returns:
+        ID del usuario o None si el token no es válido
+    """
+    user = db.query(User).filter(User.current_token == token, User.activo == True).first()
+    return user.id if user else None
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Obtener el usuario actual desde el token JWT.
+    Obtener el usuario actual desde el token de 32 caracteres.
     
     Args:
         credentials: Credenciales del token Bearer
@@ -42,9 +57,14 @@ def get_current_user(
         # Extraer el token
         token = credentials.credentials
         
-        # Decodificar el token JWT
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: str = payload.get("sub")
+        # Validar longitud del token (debe ser exactamente 32 caracteres)
+        if len(token) != 32:
+            raise credentials_exception
+        
+        # Buscar usuario por token en la base de datos
+        # Nota: Usamos el token como identificador temporal
+        # En producción, deberías tener una tabla de tokens con expiración
+        user_id = _get_user_id_from_token(token, db)
         
         if user_id is None:
             raise credentials_exception

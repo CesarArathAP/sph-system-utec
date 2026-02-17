@@ -53,6 +53,7 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         email=user_data.email,
         password_hash=hashed_password,
         nombre=user_data.nombre,
+        apellido=user_data.apellido,
         rol=user_data.rol,
         activo=True
     )
@@ -88,7 +89,7 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
 
 def login_user(db: Session, email: str, password: str) -> dict:
     """
-    Login de usuario y generación de token.
+    Login de usuario y generación de token de 32 caracteres.
     
     Args:
         db: Sesión de base de datos
@@ -109,7 +110,7 @@ def login_user(db: Session, email: str, password: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Crear token JWT
+    # Crear token de 32 caracteres
     access_token = create_access_token(
         data={
             "sub": str(user.id),
@@ -117,6 +118,10 @@ def login_user(db: Session, email: str, password: str) -> dict:
             "rol": user.rol.value
         }
     )
+    
+    # Guardar el token en la base de datos
+    user.current_token = access_token
+    db.commit()
     
     return {
         "access_token": access_token,
