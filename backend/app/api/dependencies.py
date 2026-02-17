@@ -18,16 +18,34 @@ security = HTTPBearer()
 def _get_user_id_from_token(token: str, db: Session) -> int | None:
     """
     Obtener el ID del usuario desde un token de 32 caracteres.
+    Valida que el token no haya expirado.
     
     Args:
         token: Token de 32 caracteres
         db: Sesión de base de datos
         
     Returns:
-        ID del usuario o None si el token no es válido
+        ID del usuario o None si el token no es válido o ha expirado
     """
-    user = db.query(User).filter(User.current_token == token, User.activo == True).first()
-    return user.id if user else None
+    from datetime import datetime
+    
+    user = db.query(User).filter(
+        User.current_token == token, 
+        User.activo == True
+    ).first()
+    
+    if not user:
+        return None
+    
+    # Validar que el token no haya expirado
+    if user.token_expires_at and user.token_expires_at < datetime.utcnow():
+        # Token expirado, limpiarlo
+        user.current_token = None
+        user.token_expires_at = None
+        db.commit()
+        return None
+    
+    return user.id
 
 
 def get_current_user(
