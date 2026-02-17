@@ -1,139 +1,95 @@
-# Backend - Sistema de Planificación de Horarios
+# Sistema de Gestión de Horarios (Backend)
 
-Backend del sistema de planificación inteligente de horarios académicos.
+Backend desarrollado con FastAPI para la gestión de horarios, docentes, materias y asignaciones de la UTEC.
 
-## Stack Técnico
+## 🚀 Instalación y Ejecución
 
-- **Framework**: FastAPI
-- **ORM**: SQLAlchemy
-- **Base de Datos**: SQLite (desarrollo) → PostgreSQL (producción)
-- **Migraciones**: Alembic
-- **Autenticación**: JWT
+1.  **Clonar el repositorio**
+2.  **Crear entorno virtual**:
+    ```bash
+    python -m venv venv
+    venv\Scripts\activate  # Windows
+    ```
+3.  **Instalar dependencias**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **Configurar variables de entorno** (`.env`)
+5.  **Ejecutar migraciones**:
+    ```bash
+    alembic upgrade head
+    ```
+6.  **Iniciar servidor**:
+    ```bash
+    uvicorn app.main:app --reload
+    ```
 
----
+## 👥 Equipo de Desarrollo
 
-## Instalación
-
-### 1. Crear entorno virtual
-
-```bash
-python -m venv venv
-```
-
-### 2. Activar entorno virtual
-
-**Windows:**
-```bash
-venv\Scripts\activate
-```
-
-**Linux/Mac:**
-```bash
-source venv/bin/activate
-```
-
-### 3. Instalar dependencias
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configurar variables de entorno
-
-```bash
-copy .env.example .env
-```
+*   **Cesar Arath** - *Backend Developer* - [GitHub](https://github.com/CesarArathAP)
 
 ---
 
-## Comandos
+## 📚 Documentación de API Endpoints
 
-### Iniciar servidor de desarrollo
+A continuación se detallan los endpoints disponibles en el sistema. Todos los endpoints están prefijados con `/api/v1`.
 
-```bash
-uvicorn app.main:app --reload
-```
+### 🔐 Autenticación (`/auth`)
+*   `POST /auth/login/access-token`: Obtener token de acceso (OAuth2).
+*   `POST /auth/login/test-token`: Probar validez del token actual.
 
-El servidor estará disponible en: http://localhost:8000
+### 👤 Usuarios (`/users`)
+*   `GET /users/me`: Obtener información del usuario actual.
+*   `POST /users`: Crear nuevo usuario (Admin).
+*   `GET /users`: Listar usuarios (Admin).
 
-### Documentación de la API
+### 👨‍🏫 Docentes (`/docentes`)
+*   `GET /docentes`: Listar docentes con filtros (departamento, activo).
+*   `POST /docentes`: Registrar nuevo docente.
+*   `GET /docentes/{id}`: Obtener detalle de docente.
+*   `PUT /docentes/{id}`: Actualizar docente.
+*   `DELETE /docentes/{id}`: Desactivar docente.
+*   `POST /docentes/{id}/disponibilidad`: Configurar disponibilidad horaria.
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+### 📚 Materias (`/materias`)
+*   `GET /materias`: Catálogo de materias.
+*   `POST /materias`: Crear materia.
+*   `PUT /materias/{id}`: Editar materia.
+*   `DELETE /materias/{id}`: Eliminar materia.
 
-### Migraciones de base de datos
+### 👥 Grupos (`/grupos`)
+*   `GET /grupos`: Listar grupos.
+*   `POST /grupos`: Crear grupo.
+*   `PUT /grupos/{id}`: Editar grupo.
+*   `DELETE /grupos/{id}`: Eliminar grupo.
 
-```bash
-# Crear migración
-alembic revision --autogenerate -m "descripción"
+### 🏫 Aulas (`/aulas`)
+*   `GET /aulas`: Listar aulas (filtro por tipo, capacidad).
+*   `POST /aulas`: Registrar aula.
+*   `PUT /aulas/{id}`: Editar aula.
+*   `DELETE /aulas/{id}`: Eliminar aula.
 
-# Aplicar migraciones
-alembic upgrade head
+### 📋 Asignaciones (`/asignaciones`)
+*   `GET /asignaciones`: Ver asignaciones Grupo-Materia-Docente.
+*   `POST /asignaciones`: Crear nueva asignación.
+*   `PUT /asignaciones/{id}`: Modificar asignación.
+*   `DELETE /asignaciones/{id}`: Eliminar asignación.
 
-# Revertir última migración
-alembic downgrade -1
-```
+### 📅 Horarios (`/horarios`)
+*   `GET /horarios`: Listar horarios generados.
+*   `POST /horarios`: Crear bloque de horario manual (con detección de conflictos).
+*   `PUT /horarios/{id}`: Modificar horario.
+*   `DELETE /horarios/{id}`: Eliminar horario.
+*   `POST /horarios/check-conflicts`: Verificar conflictos sin guardar.
+*   `GET /horarios/registered-conflicts/list`: Ver historial de conflictos registrados.
+*   `PUT /horarios/conflicts/{id}/resolve`: Marcar conflicto como resuelto.
 
----
-
-## Scripts de ayuda
-
-### Setup automático (Windows)
-
-```bash
-setup.bat
-```
-
-### Inicio rápido (Windows)
-
-```bash
-start.bat
-```
-
----
-
-## Docker
-
-### Iniciar con Docker Compose
-
-Desde la raíz del proyecto:
-
-```bash
-docker-compose up -d
-```
-
-Esto iniciará:
-- PostgreSQL en puerto 5432
-- Backend en puerto 8000
-
-### Comandos útiles
-
-```bash
-# Ver logs
-docker-compose logs -f backend
-
-# Detener servicios
-docker-compose down
-
-# Reconstruir imágenes
-docker-compose up -d --build
-
-# Ejecutar migraciones manualmente
-docker-compose exec backend alembic upgrade head
-
-# Ejecutar seed de datos
-docker-compose exec backend python seed.py
-```
-
-### Acceder a la base de datos
-
-```bash
-docker-compose exec db psql -U sph_user -d sph_system
-```
-
----
-
-## Equipo
-
-- Cesar Arath Angeles Pérez
-- Angel Guerra Muñoz
+### ⚡ Generación Automática (`/schedule`)
+*   `POST /schedule/generate`: **Generar horarios automáticamente**.
+    *   Algoritmo optimizado que considera: 
+        *   Disponibilidad docente.
+        *   Carga máxima semanal.
+        *   Preferencias de horario.
+        *   Tipo y capacidad de aula.
+*   `GET /schedule/{ciclo}/summary`: Resumen estadístico de la generación.
+*   `DELETE /schedule/{ciclo}`: Limpiar todos los horarios del ciclo.
