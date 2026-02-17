@@ -9,3 +9,5 @@ export { default as AulasLayout } from './AulasLayout';
 export { default as AulasModal } from './AulasModal';
 export { default as MateriasLayout } from './MateriasLayout';
 export { default as MateriasModal } from './MateriasModal';
+export { default as GruposLayout } from './GruposLayout';
+export { default as GruposModal } from './GruposModal';
