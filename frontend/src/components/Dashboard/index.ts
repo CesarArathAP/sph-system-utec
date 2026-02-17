@@ -7,3 +7,5 @@ export { default as ProfesoresModal } from './ProfesoresModal';
 export { default as DisponibilidadModal } from './DisponibilidadModal';
 export { default as AulasLayout } from './AulasLayout';
 export { default as AulasModal } from './AulasModal';
+export { default as MateriasLayout } from './MateriasLayout';
+export { default as MateriasModal } from './MateriasModal';
