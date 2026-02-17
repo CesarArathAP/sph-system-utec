@@ -89,7 +89,7 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
 
 def login_user(db: Session, email: str, password: str) -> dict:
     """
-    Login de usuario y generación de token de 32 caracteres.
+    Login de usuario y generación de token de 32 caracteres con expiración de 24 horas.
     
     Args:
         db: Sesión de base de datos
@@ -102,6 +102,8 @@ def login_user(db: Session, email: str, password: str) -> dict:
     Raises:
         HTTPException: Si las credenciales son incorrectas
     """
+    from datetime import datetime, timedelta
+    
     user = authenticate_user(db, email, password)
     if not user:
         raise HTTPException(
@@ -119,8 +121,9 @@ def login_user(db: Session, email: str, password: str) -> dict:
         }
     )
     
-    # Guardar el token en la base de datos
+    # Guardar el token en la base de datos con expiración de 24 horas
     user.current_token = access_token
+    user.token_expires_at = datetime.utcnow() + timedelta(hours=24)
     db.commit()
     
     return {
