@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import ScheduleTable from './ScheduleTable';
 import AssignmentModal from './AssignmentModal';
+import ProfesoresLayout from './ProfesoresLayout';
 
 export default function DashboardLayout() {
   const [activeMenu, setActiveMenu] = useState('horario');
@@ -22,7 +23,8 @@ export default function DashboardLayout() {
 
       {/* Main Content */}
       <main className="ml-64 flex-1 overflow-auto">
-        <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />
+        {activeMenu === 'horario' && <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />}
+        {activeMenu === 'profesores' && <ProfesoresLayout />}
       </main>
 
       {/* Modal */}
