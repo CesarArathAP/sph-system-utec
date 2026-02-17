@@ -19,9 +19,9 @@ Backend desarrollado con FastAPI para la gestión de horarios, docentes, materia
     ```bash
     alembic upgrade head
     ```
-6.  **Iniciar servidor**:
+6.  **Iniciar servidor (Importante: usar python -m para evitar bloqueos)**:
     ```bash
-    uvicorn app.main:app --reload
+    python -m uvicorn app.main:app --reload
     ```
 
 ## 👥 Equipo de Desarrollo
@@ -30,185 +30,277 @@ Backend desarrollado con FastAPI para la gestión de horarios, docentes, materia
 
 ---
 
-## 📚 Documentación de API Endpoints
+## 📚 Documentación de API Endpoints (JSON de Prueba)
 
-A continuación se detallan los endpoints principales con ejemplos de uso mediante `curl`.
+A continuación se listan los endpoints con sus respectivos payloads JSON para facilitar las pruebas en herramientas como Postman o Insomnia.
 
-> **Nota:** Para la mayoría de los endpoints de modificación (`POST`, `PUT`, `DELETE`) se requiere un token de autenticación (Bearer Token) en el header: `-H "Authorization: Bearer <token>"`.
+> **Nota:** Todos los endpoints protegidos requieren el header `Authorization: Bearer <token>`.
 
 ### 🔐 Autenticación (`/auth`)
 
-**Obtener Token (Login)**
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/login/access-token" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "username=admin@example.com&password=securepassword"
+#### `POST /api/v1/auth/login/access-token` (Login)
+**Body (x-www-form-urlencoded):**
+```text
+username=admin@example.com
+password=securepassword
 ```
+
+#### `GET /api/v1/users/me` (Get Me)
+**Headers:** `Authorization: Bearer <token>`
+**Body:** (Vacío)
+
+---
 
 ### 👤 Usuarios (`/users`)
 
-**Crear Usuario (Admin)**
-```bash
-curl -X POST "http://localhost:8000/api/v1/users" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "email": "docente@utec.edu.mx",
-       "password": "password123",
-       "nombre": "Juan",
-       "apellido": "Pérez",
-       "rol": "docente"
-     }'
+#### `POST /api/v1/users` (Create User)
+**Body (JSON):**
+```json
+{
+  "email": "docente@utec.edu.mx",
+  "password": "password123",
+  "nombre": "Juan",
+  "apellido": "Pérez",
+  "rol": "docente"
+}
 ```
+
+---
 
 ### 👨‍🏫 Docentes (`/docentes`)
 
-**Registrar Docente**
-```bash
-curl -X POST "http://localhost:8000/api/v1/docentes" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "user_id": 2,
-       "codigo_docente": "D-2024-001",
-       "departamento": "Sistemas Computacionales",
-       "horas_maximas_semana": 40,
-       "disponibilidades": []
-     }'
+#### `GET /api/v1/docentes` (List Docentes)
+**Query Params:** `page=1`, `page_size=10`, `departamento=Sistemas`
+
+#### `POST /api/v1/docentes` (Create Docente)
+**Body (JSON):**
+```json
+{
+  "user_id": 2,
+  "codigo_docente": "D-2024-001",
+  "departamento": "Sistemas Computacionales",
+  "horas_maximas_semana": 40,
+  "disponibilidades": []
+}
 ```
 
-**Agregar Disponibilidad**
-```bash
-curl -X POST "http://localhost:8000/api/v1/docentes/2/disponibilidad" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '[
-       {
-         "dia_semana": "lunes",
-         "hora_inicio": "07:00:00",
-         "hora_fin": "15:00:00"
-       }
-     ]'
+#### `GET /api/v1/docentes/{id}` (Get Docente)
+**Body:** (Vacío)
+
+#### `PUT /api/v1/docentes/{id}` (Update Docente)
+**Body (JSON):**
+```json
+{
+  "departamento": "Desarrollo de Software",
+  "horas_maximas_semana": 35,
+  "activo": true
+}
 ```
+
+#### `DELETE /api/v1/docentes/{id}` (Delete Docente)
+**Body:** (Vacío)
+
+#### `POST /api/v1/docentes/{id}/disponibilidad` (Add Disponibilidad)
+**Body (JSON):**
+```json
+[
+  {
+    "dia_semana": "lunes",
+    "hora_inicio": "07:00:00",
+    "hora_fin": "15:00:00"
+  },
+  {
+    "dia_semana": "miercoles",
+    "hora_inicio": "09:00:00",
+    "hora_fin": "14:00:00"
+  }
+]
+```
+
+---
 
 ### 📚 Materias (`/materias`)
 
-**Crear Materia**
-```bash
-curl -X POST "http://localhost:8000/api/v1/materias" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "codigo_materia": "ISC-101",
-       "nombre": "Programación Orientada a Objetos",
-       "creditos": 6,
-       "horas_semana": 5,
-       "requiere_laboratorio": true,
-       "tipo_aula_requerida": "laboratorio",
-       "descripcion": "Introducción a la POO con Java"
-     }'
+#### `GET /api/v1/materias` (List Materias)
+**Body:** (Vacío)
+
+#### `POST /api/v1/materias` (Create Materia)
+**Body (JSON):**
+```json
+{
+  "codigo_materia": "ISC-101",
+  "nombre": "Programación Orientada a Objetos",
+  "creditos": 6,
+  "horas_semana": 5,
+  "requiere_laboratorio": true,
+  "tipo_aula_requerida": "laboratorio",
+  "descripcion": "Introducción a la POO con Java"
+}
 ```
+
+#### `PUT /api/v1/materias/{id}` (Update Materia)
+**Body (JSON):**
+```json
+{
+  "nombre": "POO Avanzada",
+  "horas_semana": 6
+}
+```
+
+#### `DELETE /api/v1/materias/{id}` (Delete Materia)
+**Body:** (Vacío)
+
+---
 
 ### 👥 Grupos (`/grupos`)
 
-**Crear Grupo**
-```bash
-curl -X POST "http://localhost:8000/api/v1/grupos" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "codigo_grupo": "3A-ISC",
-       "nombre": "3A Ingeniería en Sistemas",
-       "carrera": "Ingeniería en Sistemas",
-       "semestre": 3,
-       "turno": "matutino",
-       "num_estudiantes": 35,
-       "ciclo_escolar": "2024-1"
-     }'
+#### `GET /api/v1/grupos` (List Grupos)
+**Body:** (Vacío)
+
+#### `POST /api/v1/grupos` (Create Grupo)
+**Body (JSON):**
+```json
+{
+  "codigo_grupo": "3A-ISC",
+  "nombre": "3A Ingeniería en Sistemas",
+  "carrera": "Ingeniería en Sistemas",
+  "semestre": 3,
+  "turno": "matutino",
+  "num_estudiantes": 35,
+  "ciclo_escolar": "2024-1"
+}
 ```
+
+#### `PUT /api/v1/grupos/{id}` (Update Grupo)
+**Body (JSON):**
+```json
+{
+  "num_estudiantes": 40,
+  "turno": "vespertino"
+}
+```
+
+#### `DELETE /api/v1/grupos/{id}` (Delete Grupo)
+**Body:** (Vacío)
+
+---
 
 ### 🏫 Aulas (`/aulas`)
 
-**Registrar Aula**
-```bash
-curl -X POST "http://localhost:8000/api/v1/aulas" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "codigo_aula": "B-105",
-       "nombre": "Laboratorio de Cómputo 1",
-       "capacidad": 40,
-       "tipo": "laboratorio",
-       "edificio": "B",
-       "piso": 1
-     }'
+#### `GET /api/v1/aulas` (List Aulas)
+**Query Params:** `tipo=laboratorio`, `capacidad_min=30`
+
+#### `POST /api/v1/aulas` (Create Aula)
+**Body (JSON):**
+```json
+{
+  "codigo_aula": "B-105",
+  "nombre": "Laboratorio de Cómputo 1",
+  "capacidad": 40,
+  "tipo": "laboratorio",
+  "edificio": "B",
+  "piso": 1
+}
 ```
+
+#### `PUT /api/v1/aulas/{id}` (Update Aula)
+**Body (JSON):**
+```json
+{
+  "capacidad": 45,
+  "activo": true
+}
+```
+
+#### `DELETE /api/v1/aulas/{id}` (Delete Aula)
+**Body:** (Vacío)
+
+---
 
 ### 📋 Asignaciones (`/asignaciones`)
 
-**Crear Asignación**
-```bash
-curl -X POST "http://localhost:8000/api/v1/asignaciones" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "grupo_id": 1,
-       "materia_id": 1,
-       "docente_id": 1,
-       "ciclo_escolar": "2024-1"
-     }'
+#### `GET /api/v1/asignaciones` (List Asignaciones)
+**Query Params:** `ciclo_escolar=2024-1`
+
+#### `POST /api/v1/asignaciones` (Create Asignacion)
+**Body (JSON):**
+```json
+{
+  "grupo_id": 1,
+  "materia_id": 1,
+  "docente_id": 1,
+  "ciclo_escolar": "2024-1"
+}
 ```
+
+#### `PUT /api/v1/asignaciones/{id}` (Update Asignacion)
+**Body (JSON):**
+```json
+{
+  "docente_id": 2
+}
+```
+
+#### `DELETE /api/v1/asignaciones/{id}` (Delete Asignacion)
+**Body:** (Vacío)
+
+---
 
 ### 📅 Horarios (`/horarios`)
 
-**Crear Horario Manualmente**
-```bash
-curl -X POST "http://localhost:8000/api/v1/horarios" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "asignacion_id": 1,
-       "aula_id": 1,
-       "dia_semana": "miercoles",
-       "hora_inicio": "09:00:00",
-       "hora_fin": "11:00:00",
-       "tipo_sesion": "teorica"
-     }'
+#### `GET /api/v1/horarios` (List Horarios)
+**Query Params:** `asignacion_id=1`, `dia=lunes`
+
+#### `POST /api/v1/horarios` (Create Horario - Manual)
+**Body (JSON):**
+```json
+{
+  "asignacion_id": 1,
+  "aula_id": 1,
+  "dia_semana": "miercoles",
+  "hora_inicio": "09:00:00",
+  "hora_fin": "11:00:00",
+  "tipo_sesion": "teorica"
+}
 ```
 
-**Verificar Conflictos (Sin guardar)**
-```bash
-curl -X POST "http://localhost:8000/api/v1/horarios/check-conflicts" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer <token>" \
-     -d '{
-       "dia_semana": "miercoles",
-       "hora_inicio": "09:00:00",
-       "hora_fin": "11:00:00",
-       "aula_id": 1,
-       "asignacion_id": 2
-     }'
+#### `PUT /api/v1/horarios/{id}` (Update Horario)
+**Body (JSON):**
+```json
+{
+  "aula_id": 2,
+  "dia_semana": "jueves"
+}
 ```
+
+#### `POST /api/v1/horarios/check-conflicts` (Check Conflicts Only)
+**Body (JSON):**
+```json
+{
+  "asignacion_id": 1,
+  "aula_id": 1,
+  "dia_semana": "miercoles",
+  "hora_inicio": "09:00:00",
+  "hora_fin": "11:00:00"
+}
+```
+
+#### `GET /api/v1/horarios/registered-conflicts/list` (List Registered Conflicts)
+**Body:** (Vacío)
+
+#### `PUT /api/v1/horarios/conflicts/{id}/resolve` (Resolve Conflict)
+**Body:** (Vacío - Marca conflicto como resuelto)
+
+---
 
 ### ⚡ Generación Automática (`/schedule`)
 
-**Generar Horarios Automáticamente**
-Este endpoint ejecuta el algoritmo que asigna horarios basándose en la disponibilidad de docentes y aulas.
+#### `POST /api/v1/schedule/generate` (Generate Schedule)
+**Query Params:** `ciclo_escolar=2024-1`
+**Body:** (Vacío)
 
-```bash
-curl -X POST "http://localhost:8000/api/v1/schedule/generate?ciclo_escolar=2024-1" \
-     -H "Authorization: Bearer <token>"
-```
+#### `GET /api/v1/schedule/{ciclo}/summary` (Get Summary)
+**Body:** (Vacío)
 
-**Obtener Resumen de Generación**
-```bash
-curl -X GET "http://localhost:8000/api/v1/schedule/2024-1/summary" \
-     -H "Authorization: Bearer <token>"
-```
-
-**Limpiar Horarios del Ciclo**
-Atención: Esto eliminará todos los horarios generados para ese ciclo.
-```bash
-curl -X DELETE "http://localhost:8000/api/v1/schedule/2024-1" \
-     -H "Authorization: Bearer <token>"
-```
+#### `DELETE /api/v1/schedule/{ciclo}` (Clear Schedule)
+**Body:** (Vacío)
