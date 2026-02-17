@@ -4,6 +4,7 @@ import ScheduleTable from './ScheduleTable';
 import AssignmentModal from './AssignmentModal';
 import ProfesoresLayout from './ProfesoresLayout';
 import AulasLayout from './AulasLayout';
+import MateriasLayout from './MateriasLayout';
 
 export default function DashboardLayout() {
   const [activeMenu, setActiveMenu] = useState('horario');
@@ -27,6 +28,7 @@ export default function DashboardLayout() {
         {activeMenu === 'horario' && <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />}
         {activeMenu === 'profesores' && <ProfesoresLayout />}
         {activeMenu === 'aulas' && <AulasLayout />}
+        {activeMenu === 'materias' && <MateriasLayout />}
       </main>
 
       {/* Modal */}
