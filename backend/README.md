@@ -32,64 +32,183 @@ Backend desarrollado con FastAPI para la gestión de horarios, docentes, materia
 
 ## 📚 Documentación de API Endpoints
 
-A continuación se detallan los endpoints disponibles en el sistema. Todos los endpoints están prefijados con `/api/v1`.
+A continuación se detallan los endpoints principales con ejemplos de uso mediante `curl`.
+
+> **Nota:** Para la mayoría de los endpoints de modificación (`POST`, `PUT`, `DELETE`) se requiere un token de autenticación (Bearer Token) en el header: `-H "Authorization: Bearer <token>"`.
 
 ### 🔐 Autenticación (`/auth`)
-*   `POST /auth/login/access-token`: Obtener token de acceso (OAuth2).
-*   `POST /auth/login/test-token`: Probar validez del token actual.
+
+**Obtener Token (Login)**
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login/access-token" \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "username=admin@example.com&password=securepassword"
+```
 
 ### 👤 Usuarios (`/users`)
-*   `GET /users/me`: Obtener información del usuario actual.
-*   `POST /users`: Crear nuevo usuario (Admin).
-*   `GET /users`: Listar usuarios (Admin).
+
+**Crear Usuario (Admin)**
+```bash
+curl -X POST "http://localhost:8000/api/v1/users" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "email": "docente@utec.edu.mx",
+       "password": "password123",
+       "nombre": "Juan",
+       "apellido": "Pérez",
+       "rol": "docente"
+     }'
+```
 
 ### 👨‍🏫 Docentes (`/docentes`)
-*   `GET /docentes`: Listar docentes con filtros (departamento, activo).
-*   `POST /docentes`: Registrar nuevo docente.
-*   `GET /docentes/{id}`: Obtener detalle de docente.
-*   `PUT /docentes/{id}`: Actualizar docente.
-*   `DELETE /docentes/{id}`: Desactivar docente.
-*   `POST /docentes/{id}/disponibilidad`: Configurar disponibilidad horaria.
+
+**Registrar Docente**
+```bash
+curl -X POST "http://localhost:8000/api/v1/docentes" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "user_id": 2,
+       "codigo_docente": "D-2024-001",
+       "departamento": "Sistemas Computacionales",
+       "horas_maximas_semana": 40,
+       "disponibilidades": []
+     }'
+```
+
+**Agregar Disponibilidad**
+```bash
+curl -X POST "http://localhost:8000/api/v1/docentes/2/disponibilidad" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '[
+       {
+         "dia_semana": "lunes",
+         "hora_inicio": "07:00:00",
+         "hora_fin": "15:00:00"
+       }
+     ]'
+```
 
 ### 📚 Materias (`/materias`)
-*   `GET /materias`: Catálogo de materias.
-*   `POST /materias`: Crear materia.
-*   `PUT /materias/{id}`: Editar materia.
-*   `DELETE /materias/{id}`: Eliminar materia.
+
+**Crear Materia**
+```bash
+curl -X POST "http://localhost:8000/api/v1/materias" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "codigo_materia": "ISC-101",
+       "nombre": "Programación Orientada a Objetos",
+       "creditos": 6,
+       "horas_semana": 5,
+       "requiere_laboratorio": true,
+       "tipo_aula_requerida": "laboratorio",
+       "descripcion": "Introducción a la POO con Java"
+     }'
+```
 
 ### 👥 Grupos (`/grupos`)
-*   `GET /grupos`: Listar grupos.
-*   `POST /grupos`: Crear grupo.
-*   `PUT /grupos/{id}`: Editar grupo.
-*   `DELETE /grupos/{id}`: Eliminar grupo.
+
+**Crear Grupo**
+```bash
+curl -X POST "http://localhost:8000/api/v1/grupos" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "codigo_grupo": "3A-ISC",
+       "nombre": "3A Ingeniería en Sistemas",
+       "carrera": "Ingeniería en Sistemas",
+       "semestre": 3,
+       "turno": "matutino",
+       "num_estudiantes": 35,
+       "ciclo_escolar": "2024-1"
+     }'
+```
 
 ### 🏫 Aulas (`/aulas`)
-*   `GET /aulas`: Listar aulas (filtro por tipo, capacidad).
-*   `POST /aulas`: Registrar aula.
-*   `PUT /aulas/{id}`: Editar aula.
-*   `DELETE /aulas/{id}`: Eliminar aula.
+
+**Registrar Aula**
+```bash
+curl -X POST "http://localhost:8000/api/v1/aulas" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "codigo_aula": "B-105",
+       "nombre": "Laboratorio de Cómputo 1",
+       "capacidad": 40,
+       "tipo": "laboratorio",
+       "edificio": "B",
+       "piso": 1
+     }'
+```
 
 ### 📋 Asignaciones (`/asignaciones`)
-*   `GET /asignaciones`: Ver asignaciones Grupo-Materia-Docente.
-*   `POST /asignaciones`: Crear nueva asignación.
-*   `PUT /asignaciones/{id}`: Modificar asignación.
-*   `DELETE /asignaciones/{id}`: Eliminar asignación.
+
+**Crear Asignación**
+```bash
+curl -X POST "http://localhost:8000/api/v1/asignaciones" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "grupo_id": 1,
+       "materia_id": 1,
+       "docente_id": 1,
+       "ciclo_escolar": "2024-1"
+     }'
+```
 
 ### 📅 Horarios (`/horarios`)
-*   `GET /horarios`: Listar horarios generados.
-*   `POST /horarios`: Crear bloque de horario manual (con detección de conflictos).
-*   `PUT /horarios/{id}`: Modificar horario.
-*   `DELETE /horarios/{id}`: Eliminar horario.
-*   `POST /horarios/check-conflicts`: Verificar conflictos sin guardar.
-*   `GET /horarios/registered-conflicts/list`: Ver historial de conflictos registrados.
-*   `PUT /horarios/conflicts/{id}/resolve`: Marcar conflicto como resuelto.
+
+**Crear Horario Manualmente**
+```bash
+curl -X POST "http://localhost:8000/api/v1/horarios" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "asignacion_id": 1,
+       "aula_id": 1,
+       "dia_semana": "miercoles",
+       "hora_inicio": "09:00:00",
+       "hora_fin": "11:00:00",
+       "tipo_sesion": "teorica"
+     }'
+```
+
+**Verificar Conflictos (Sin guardar)**
+```bash
+curl -X POST "http://localhost:8000/api/v1/horarios/check-conflicts" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token>" \
+     -d '{
+       "dia_semana": "miercoles",
+       "hora_inicio": "09:00:00",
+       "hora_fin": "11:00:00",
+       "aula_id": 1,
+       "asignacion_id": 2
+     }'
+```
 
 ### ⚡ Generación Automática (`/schedule`)
-*   `POST /schedule/generate`: **Generar horarios automáticamente**.
-    *   Algoritmo optimizado que considera: 
-        *   Disponibilidad docente.
-        *   Carga máxima semanal.
-        *   Preferencias de horario.
-        *   Tipo y capacidad de aula.
-*   `GET /schedule/{ciclo}/summary`: Resumen estadístico de la generación.
-*   `DELETE /schedule/{ciclo}`: Limpiar todos los horarios del ciclo.
+
+**Generar Horarios Automáticamente**
+Este endpoint ejecuta el algoritmo que asigna horarios basándose en la disponibilidad de docentes y aulas.
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/schedule/generate?ciclo_escolar=2024-1" \
+     -H "Authorization: Bearer <token>"
+```
+
+**Obtener Resumen de Generación**
+```bash
+curl -X GET "http://localhost:8000/api/v1/schedule/2024-1/summary" \
+     -H "Authorization: Bearer <token>"
+```
+
+**Limpiar Horarios del Ciclo**
+Atención: Esto eliminará todos los horarios generados para ese ciclo.
+```bash
+curl -X DELETE "http://localhost:8000/api/v1/schedule/2024-1" \
+     -H "Authorization: Bearer <token>"
+```
