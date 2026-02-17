@@ -5,3 +5,5 @@ export { default as AssignmentModal } from './AssignmentModal';
 export { default as ProfesoresLayout } from './ProfesoresLayout';
 export { default as ProfesoresModal } from './ProfesoresModal';
 export { default as DisponibilidadModal } from './DisponibilidadModal';
+export { default as AulasLayout } from './AulasLayout';
+export { default as AulasModal } from './AulasModal';
