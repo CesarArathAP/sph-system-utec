@@ -1,53 +1,46 @@
 import React, { useState } from 'react';
+import authService from '../../utils/authService';
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
-    fullName: '',
-    role: 'Profesor',
+    nombre: '',
+    apellido: '',
+    rol: 'docente' as 'docente' | 'admin' | 'coordinador' | 'estudiante',
     email: '',
     password: '',
-    confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
-
+    setSuccess('');
     setLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await authService.register({
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        rol: formData.rol,
+        email: formData.email,
+        password: formData.password,
+      });
 
-      localStorage.setItem('user', JSON.stringify({ 
-        email: formData.email, 
-        name: formData.fullName,
-        role: formData.role 
-      }));
-      
-      // Navegar al dashboard
-      window.location.href = '/dashboard';
+      if (response.id) {
+        setSuccess('¡Cuenta creada exitosamente! Redirigiendo al login...');
+        setTimeout(() => { window.location.href = '/'; }, 1500);
+      } else {
+        setError(response.message || 'Error al crear la cuenta');
+      }
     } catch (err) {
-      setError('Error en el registro');
+      setError('Error de conexión con el servidor');
     } finally {
       setLoading(false);
     }
@@ -55,36 +48,43 @@ export default function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-          Nombre completo
-        </label>
-        <input
-          id="fullName"
-          type="text"
-          name="fullName"
-          value={formData.fullName}
-          onChange={handleChange}
-          placeholder="Juan Pérez"
-          required
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-2">
+            Nombre
+          </label>
+          <input
+            id="nombre" type="text" name="nombre"
+            value={formData.nombre} onChange={handleChange}
+            placeholder="Juan" required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+          />
+        </div>
+        <div>
+          <label htmlFor="apellido" className="block text-sm font-medium text-gray-700 mb-2">
+            Apellido
+          </label>
+          <input
+            id="apellido" type="text" name="apellido"
+            value={formData.apellido} onChange={handleChange}
+            placeholder="Pérez García" required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+          />
+        </div>
       </div>
 
       <div>
-        <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="rol" className="block text-sm font-medium text-gray-700 mb-2">
           Rol
         </label>
         <select
-          id="role"
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
+          id="rol" name="rol" value={formData.rol} onChange={handleChange}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition bg-white"
         >
-          <option value="Profesor">Profesor</option>
-          <option value="Administrador">Administrador</option>
-          <option value="Estudiante">Estudiante</option>
+          <option value="docente">Docente</option>
+          <option value="coordinador">Coordinador</option>
+          <option value="admin">Administrador</option>
+          <option value="estudiante">Estudiante</option>
         </select>
       </div>
 
@@ -93,13 +93,9 @@ export default function RegisterForm() {
           Correo Electrónico
         </label>
         <input
-          id="email"
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="hola@gmail.com"
-          required
+          id="email" type="email" name="email"
+          value={formData.email} onChange={handleChange}
+          placeholder="hola@utec.edu.mx" required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
         />
       </div>
@@ -109,29 +105,9 @@ export default function RegisterForm() {
           Contraseña
         </label>
         <input
-          id="password"
-          type="password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          placeholder="••••••••"
-          required
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-          Confirmar contraseña
-        </label>
-        <input
-          id="confirmPassword"
-          type="password"
-          name="confirmPassword"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          placeholder="••••••••"
-          required
+          id="password" type="password" name="password"
+          value={formData.password} onChange={handleChange}
+          placeholder="••••••••" required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
         />
       </div>
@@ -142,12 +118,17 @@ export default function RegisterForm() {
         </div>
       )}
 
+      {success && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          {success}
+        </div>
+      )}
+
       <button
-        type="submit"
-        disabled={loading}
+        type="submit" disabled={loading}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Creando cuenta...' : 'Acceder'}
+        {loading ? 'Creando cuenta...' : 'Crear cuenta'}
       </button>
 
       <div className="text-center text-xs text-gray-500">
