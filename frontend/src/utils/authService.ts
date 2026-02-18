@@ -29,23 +29,25 @@ class AuthService {
 
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      const response = await fetch(
-        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.REGISTER}`,
-        {
-          method: 'POST',
-          headers: API_CONFIG.HEADERS,
-          body: JSON.stringify(data),
-        }
-      );
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.REGISTER}`;
+      console.log('[AuthService] register URL:', url); // debug
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const json = await response.json();
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
+        return {
+          message: json.detail || `Error: ${response.statusText}`,
+        };
       }
 
-      return await response.json();
+      return json;
     } catch (error) {
       return {
-        success: false,
         message: error instanceof Error ? error.message : 'Error en el registro',
       };
     }
