@@ -5,25 +5,61 @@ import type { LoginCredentials, RegisterData, AuthResponse, ApiError } from '../
 class AuthService {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
+      // El backend usa OAuth2PasswordRequestForm: necesita form-data con username/password
+      const formData = new URLSearchParams();
+      formData.append('username', credentials.email);
+      formData.append('password', credentials.password);
+
       const response = await fetch(
         `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.LOGIN}`,
         {
           method: 'POST',
-          headers: API_CONFIG.HEADERS,
-          body: JSON.stringify(credentials),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData.toString(),
         }
       );
 
+      const json = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
+        return { message: json.detail || 'Credenciales incorrectas' };
       }
 
-      return await response.json();
+      // Guardar token en localStorage
+      if (json.access_token) {
+        this.setToken(json.access_token);
+
+        // Obtener datos del usuario con el token
+        const userInfo = await this.getMe(json.access_token);
+        if (userInfo) {
+          localStorage.setItem('current_user', JSON.stringify(userInfo));
+        }
+      }
+
+      return json;
     } catch (error) {
       return {
-        success: false,
         message: error instanceof Error ? error.message : 'Error en la autenticación',
       };
+    }
+  }
+
+  async getMe(token: string): Promise<AuthResponse | null> {
+    try {
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/auth/me`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
     }
   }
 
