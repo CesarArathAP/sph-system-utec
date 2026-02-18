@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     """Schema base de usuario."""
     email: EmailStr
     nombre: str = Field(..., min_length=1, max_length=100)
+    apellido: str = Field(..., min_length=1, max_length=100)
 
 
 class UserCreate(UserBase):
