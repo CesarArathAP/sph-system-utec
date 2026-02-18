@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import authService from '../../utils/authService';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -12,21 +13,16 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      // Validación básica
-      if (!email || !password) {
-        setError('Por favor completa todos los campos');
-        setLoading(false);
-        return;
+      const response = await authService.login({ email, password });
+
+      if (response.access_token) {
+        // Token guardado en authService.login(), redirigir al dashboard
+        window.location.href = '/dashboard';
+      } else {
+        setError(response.message || 'Credenciales incorrectas');
       }
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      localStorage.setItem('user', JSON.stringify({ email, name: 'Usuario' }));
-      
-      // Navegar al dashboard
-      window.location.href = '/dashboard';
     } catch (err) {
-      setError('Error en la autenticación');
+      setError('Error de conexión con el servidor');
     } finally {
       setLoading(false);
     }
@@ -43,7 +39,7 @@ export default function LoginForm() {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="hola@gmail.com"
+          placeholder="hola@utec.edu.mx"
           required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
         />
