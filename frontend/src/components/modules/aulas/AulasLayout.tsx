@@ -21,10 +21,10 @@ function toBackend(a: Aula) {
   return {
     codigo_aula: a.codigo,
     nombre: a.nombre,
-    capacidad: a.capacidad,
+    capacidad: a.capacidad || 1,           // mínimo 1 (schema ge=1)
     tipo: a.tipo,
     edificio: a.edificio || null,
-    piso: a.piso || null,
+    piso: (a.piso && a.piso > 0) ? a.piso : null,  // null si 0 o vacío (schema ge=1)
     equipamiento: a.equipamiento || null,
     activo: a.activo,
   };
@@ -102,7 +102,11 @@ export default function AulasLayout() {
         },
         body: JSON.stringify(toBackend(aula)),
       });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const msg = err?.detail ?? `Error ${res.status}`;
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      }
       setIsModalOpen(false);
       await fetchAulas();
     } catch (e: any) {

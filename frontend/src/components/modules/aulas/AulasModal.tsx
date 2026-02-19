@@ -41,9 +41,11 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
       : e.target.value;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'capacidad' || name === 'piso'
-        ? (value === '' ? null : parseInt(value as string) || 0)
-        : value,
+      [name]: name === 'piso'
+        ? (value === '' || value === '0' ? null : parseInt(value as string))   // piso: null si vacío (ge=1)
+        : name === 'capacidad'
+          ? (parseInt(value as string) || 1)                                    // capacidad: mínimo 1
+          : value,
     }));
   };
 

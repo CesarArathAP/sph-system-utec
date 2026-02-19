@@ -122,6 +122,7 @@ def create_aula(db: Session, aula_data: AulaCreate) -> Aula:
         tipo=aula_data.tipo,
         edificio=aula_data.edificio,
         piso=aula_data.piso,
+        equipamiento=aula_data.equipamiento,
         activo=True
     )
     
