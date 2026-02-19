@@ -1,38 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-
-interface Profesor {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  departamento: string;
-  horasMaximas: number;
-}
+import type { Docente } from './ProfesoresLayout';
 
 interface ProfesoresModalProps {
   isOpen: boolean;
-  profesor: Profesor | null;
+  docente: Docente | null;  // null → crear, objeto → editar
   onClose: () => void;
-  onSave: (profesor: Profesor) => void;
+  onSave: (docente: Docente) => void;
 }
 
-export default function ProfesoresModal({ isOpen, profesor, onClose, onSave }: ProfesoresModalProps) {
-  const emptyForm: Profesor = {
-    codigo: '', nombre: '', departamento: '', horasMaximas: 0,
-  };
+const emptyForm: Docente = {
+  user_id: 0,
+  codigo_docente: '',
+  departamento: null,
+  horas_maximas_semana: 20,
+  activo: true,
+  disponibilidades: [],
+};
 
-  const [formData, setFormData] = useState<Profesor>(emptyForm);
+export default function ProfesoresModal({ isOpen, docente, onClose, onSave }: ProfesoresModalProps) {
+  const [formData, setFormData] = useState<Docente>(emptyForm);
 
+  /* Sincronizar form cuando cambia el docente seleccionado */
   useEffect(() => {
-    setFormData(profesor ?? emptyForm);
-  }, [profesor, isOpen]);
+    setFormData(docente ? { ...docente } : { ...emptyForm });
+  }, [docente, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'horasMaximas' ? parseInt(value) || 0 : value,
-    }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, type, value, checked } = e.target;
+
+    if (type === 'checkbox') {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+    } else if (name === 'horas_maximas_semana' || name === 'user_id') {
+      setFormData((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
+    } else if (name === 'departamento') {
+      setFormData((prev) => ({ ...prev, departamento: value || null }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,7 +45,7 @@ export default function ProfesoresModal({ isOpen, profesor, onClose, onSave }: P
     onSave(formData);
   };
 
-  const isEditing = !!profesor?.id;
+  const isEditing = !!docente?.id;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -58,7 +63,7 @@ export default function ProfesoresModal({ isOpen, profesor, onClose, onSave }: P
           {/* Header */}
           <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 bg-white rounded-t-xl">
             <Dialog.Title className="text-xl font-bold text-gray-800">
-              {isEditing ? 'Editar Profesor' : 'Crear Profesor'}
+              {isEditing ? 'Editar Docente' : 'Nuevo Docente'}
             </Dialog.Title>
             <Dialog.Close
               onClick={onClose}
@@ -72,36 +77,53 @@ export default function ProfesoresModal({ isOpen, profesor, onClose, onSave }: P
           {/* Formulario */}
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
 
-            {/* Sección info */}
+            {/* Banner informativo */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-blue-800 mb-1">Información Personal</h3>
+              <h3 className="text-sm font-semibold text-blue-800 mb-1">
+                {isEditing ? 'Editar datos del docente' : 'Registrar nuevo docente'}
+              </h3>
               <p className="text-xs text-blue-600">
-                Completa los datos del profesor para darlo de alta en el sistema.
+                {isEditing
+                  ? 'Modifica los campos que desees actualizar.'
+                  : 'Completa los datos para dar de alta al docente en el sistema.'}
               </p>
             </div>
+
+            {/* user_id (solo en creación) */}
+            {!isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ID de usuario <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="user_id"
+                  value={formData.user_id || ''}
+                  onChange={handleChange}
+                  placeholder="ej. 5"
+                  min={1}
+                  required={!isEditing}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  ID del usuario registrado en el sistema al que se vinculará este docente.
+                </p>
+              </div>
+            )}
 
             {/* Código */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Código
+                Código <span className="text-red-500">*</span>
               </label>
               <input
-                type="text" name="codigo"
-                value={formData.codigo} onChange={handleChange}
-                placeholder="ej. DOC001" required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-
-            {/* Nombre */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre completo
-              </label>
-              <input
-                type="text" name="nombre"
-                value={formData.nombre} onChange={handleChange}
-                placeholder="ej. Dr. Juan García" required
+                type="text"
+                name="codigo_docente"
+                value={formData.codigo_docente}
+                onChange={handleChange}
+                placeholder="ej. DOC001"
+                required
+                maxLength={20}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
@@ -112,9 +134,12 @@ export default function ProfesoresModal({ isOpen, profesor, onClose, onSave }: P
                 Departamento
               </label>
               <input
-                type="text" name="departamento"
-                value={formData.departamento} onChange={handleChange}
-                placeholder="ej. Ingeniería de Software" required
+                type="text"
+                name="departamento"
+                value={formData.departamento ?? ''}
+                onChange={handleChange}
+                placeholder="ej. Ingeniería de Software"
+                maxLength={100}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
@@ -122,21 +147,43 @@ export default function ProfesoresModal({ isOpen, profesor, onClose, onSave }: P
             {/* Horas máximas */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Horas máximas por semana
+                Horas máximas por semana <span className="text-red-500">*</span>
               </label>
               <input
-                type="number" name="horasMaximas"
-                value={formData.horasMaximas} onChange={handleChange}
-                placeholder="ej. 20" min="0" max="40" required
+                type="number"
+                name="horas_maximas_semana"
+                value={formData.horas_maximas_semana}
+                onChange={handleChange}
+                min={1}
+                max={60}
+                required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
             </div>
+
+            {/* Activo (solo en edición) */}
+            {isEditing && (
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  name="activo"
+                  id="activo"
+                  checked={formData.activo}
+                  onChange={handleChange}
+                  className="w-5 h-5 accent-green-600 cursor-pointer"
+                />
+                <label htmlFor="activo" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Docente activo
+                </label>
+              </div>
+            )}
 
             {/* Botones */}
             <div className="flex gap-4 justify-end border-t border-gray-200 pt-5">
               <Dialog.Close asChild>
                 <button
-                  type="button" onClick={onClose}
+                  type="button"
+                  onClick={onClose}
                   className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition"
                 >
                   Cancelar
