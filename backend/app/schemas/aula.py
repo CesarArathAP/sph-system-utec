@@ -14,6 +14,7 @@ class AulaBase(BaseModel):
     tipo: str = Field(..., max_length=20)
     edificio: Optional[str] = Field(None, max_length=50)
     piso: Optional[int] = Field(None, ge=1, le=20)
+    equipamiento: Optional[str] = None
 
 
 class AulaCreate(AulaBase):
@@ -29,6 +30,7 @@ class AulaUpdate(BaseModel):
     tipo: Optional[str] = Field(None, max_length=20)
     edificio: Optional[str] = Field(None, max_length=50)
     piso: Optional[int] = Field(None, ge=1, le=20)
+    equipamiento: Optional[str] = None       # campo TEXT
     activo: Optional[bool] = None
 
 

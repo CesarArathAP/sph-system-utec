@@ -4,12 +4,15 @@ import * as Dialog from '@radix-ui/react-dialog';
 interface Aula {
   id?: string;
   codigo: string;
-  capacidad: number;
   nombre: string;
+  capacidad: number;
   tipo: string;
   edificio: string;
-  piso: string;
+  piso: number | null;
   equipamiento: string;
+  activo: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface AulasModalProps {
@@ -21,8 +24,8 @@ interface AulasModalProps {
 
 export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModalProps) {
   const emptyForm: Aula = {
-    codigo: '', capacidad: 0, nombre: '',
-    tipo: '', edificio: '', piso: '', equipamiento: '',
+    codigo: '', nombre: '', capacidad: 0,
+    tipo: '', edificio: '', piso: null, equipamiento: '', activo: true,
   };
 
   const [formData, setFormData] = useState<Aula>(emptyForm);
@@ -31,11 +34,16 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
     setFormData(aula ?? emptyForm);
   }, [aula, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, type } = e.target;
+    const value = type === 'checkbox'
+      ? (e.target as HTMLInputElement).checked
+      : e.target.value;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'capacidad' ? parseInt(value) || 0 : value,
+      [name]: name === 'capacidad' || name === 'piso'
+        ? (value === '' ? null : parseInt(value as string) || 0)
+        : value,
     }));
   };
 
@@ -108,7 +116,7 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
                 </label>
                 <input
                   type="text" name="piso"
-                  value={formData.piso} onChange={handleChange}
+                  value={formData.piso ?? ''} onChange={handleChange}
                   placeholder="ej. 1" required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
@@ -165,12 +173,27 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Equipamiento
               </label>
-              <input
-                type="text" name="equipamiento"
-                value={formData.equipamiento} onChange={handleChange}
-                placeholder="ej. Computadoras, Proyector, Pizarrón"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              <textarea
+                name="equipamiento"
+                value={formData.equipamiento}
+                onChange={handleChange}
+                placeholder="ej. Computadoras, Proyector, Pizarrón inteligente"
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
               />
+            </div>
+
+            {/* Activo */}
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <input
+                type="checkbox" id="activo" name="activo"
+                checked={formData.activo}
+                onChange={handleChange}
+                className="w-4 h-4 accent-blue-600 cursor-pointer"
+              />
+              <label htmlFor="activo" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                Aula activa
+              </label>
             </div>
 
             {/* Botones */}
