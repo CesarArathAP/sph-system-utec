@@ -10,6 +10,9 @@ interface Grupo {
   turno: string;
   numeroEstudiantes: number;
   cicloEscolar: string;
+  activo: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface GruposModalProps {
@@ -22,7 +25,7 @@ interface GruposModalProps {
 export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposModalProps) {
   const emptyForm: Grupo = {
     codigo: '', nombre: '', carrera: '',
-    semestre: 1, turno: '', numeroEstudiantes: 0, cicloEscolar: '',
+    semestre: 1, turno: '', numeroEstudiantes: 0, cicloEscolar: '', activo: true,
   };
 
   const [formData, setFormData] = useState<Grupo>(emptyForm);
@@ -32,11 +35,14 @@ export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposMo
   }, [grupo, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name, type } = e.target;
+    const value = type === 'checkbox'
+      ? (e.target as HTMLInputElement).checked
+      : e.target.value;
     setFormData((prev) => ({
       ...prev,
       [name]: name === 'semestre' || name === 'numeroEstudiantes'
-        ? parseInt(value) || 0
+        ? parseInt(value as string) || 0
         : value,
     }));
   };
@@ -172,6 +178,19 @@ export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposMo
                 placeholder="ej. 2026-1" required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
+            </div>
+
+            {/* Activo */}
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <input
+                type="checkbox" id="activo" name="activo"
+                checked={formData.activo}
+                onChange={handleChange}
+                className="w-4 h-4 accent-blue-600 cursor-pointer"
+              />
+              <label htmlFor="activo" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                Grupo activo
+              </label>
             </div>
 
             {/* Botones */}
