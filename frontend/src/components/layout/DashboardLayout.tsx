@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../layout/Sidebar';
+import HomeDashboard from '../layout/HomeDashboard';
 import { ScheduleTable } from '../modules/horarios';
 import { AssignmentModal } from '../modules/asignaciones';
 import { ProfesoresLayout } from '../modules/profesores';
@@ -8,13 +9,23 @@ import { MateriasLayout } from '../modules/materias';
 import { GruposLayout } from '../modules/grupos';
 
 export default function DashboardLayout() {
-  const [activeMenu, setActiveMenu] = useState('horario');
+  const [activeMenu, setActiveMenu] = useState('inicio');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Escuchar evento de navegación desde HomeDashboard (accesos rápidos)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const menu = (e as CustomEvent<string>).detail;
+      setActiveMenu(menu);
+    };
+    window.addEventListener('dashboard-navigate', handler);
+    return () => window.removeEventListener('dashboard-navigate', handler);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('current_user');
-    window.location.href = '/';
+    window.location.replace('/');
   };
 
   return (
@@ -28,14 +39,15 @@ export default function DashboardLayout() {
 
       {/* Main Content */}
       <main className="ml-64 flex-1 overflow-auto">
-        {activeMenu === 'horario' && <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />}
+        {activeMenu === 'inicio' && <HomeDashboard />}
+        {activeMenu === 'horarios' && <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />}
         {activeMenu === 'profesores' && <ProfesoresLayout />}
         {activeMenu === 'aulas' && <AulasLayout />}
         {activeMenu === 'materias' && <MateriasLayout />}
         {activeMenu === 'grupos' && <GruposLayout />}
       </main>
 
-      {/* Modal */}
+      {/* Modal de asignación */}
       <AssignmentModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
