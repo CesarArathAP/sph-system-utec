@@ -5,7 +5,6 @@ import {
 
 interface SidebarProps {
   activeMenu: string;
-  onMenuChange: (menu: string) => void;
   onLogout: () => void;
 }
 
@@ -18,12 +17,12 @@ interface CurrentUser {
 }
 
 const menuItems = [
-  { id: 'inicio', label: 'Inicio', Icon: Home },
-  { id: 'horarios', label: 'Horarios', Icon: Calendar },
-  { id: 'profesores', label: 'Profesores', Icon: GraduationCap },
-  { id: 'materias', label: 'Materias', Icon: BookOpen },
-  { id: 'aulas', label: 'Aulas', Icon: Building2 },
-  { id: 'grupos', label: 'Grupos', Icon: Users },
+  { id: 'inicio', label: 'Inicio', Icon: Home, href: '/auth/dashboard' },
+  { id: 'horarios', label: 'Horarios', Icon: Calendar, href: '/auth/dashboard/horarios' },
+  { id: 'profesores', label: 'Profesores', Icon: GraduationCap, href: '/auth/dashboard/profesores' },
+  { id: 'materias', label: 'Materias', Icon: BookOpen, href: '/auth/dashboard/materias' },
+  { id: 'aulas', label: 'Aulas', Icon: Building2, href: '/auth/dashboard/aulas' },
+  { id: 'grupos', label: 'Grupos', Icon: Users, href: '/auth/dashboard/grupos' },
 ];
 
 const rolLabel: Record<string, string> = {
@@ -32,7 +31,7 @@ const rolLabel: Record<string, string> = {
   docente: 'Docente',
 };
 
-export default function Sidebar({ activeMenu, onMenuChange, onLogout }: SidebarProps) {
+export default function Sidebar({ activeMenu, onLogout }: SidebarProps) {
   const [user, setUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
@@ -71,10 +70,10 @@ export default function Sidebar({ activeMenu, onMenuChange, onLogout }: SidebarP
           Menú
         </p>
         <ul className="space-y-1">
-          {menuItems.map(({ id, label, Icon }) => (
+          {menuItems.map(({ id, label, Icon, href }) => (
             <li key={id}>
-              <button
-                onClick={() => onMenuChange(id)}
+              <a
+                href={href}
                 className={`w-full text-left px-4 py-2.5 rounded-lg transition-all flex items-center gap-3 text-sm font-medium ${activeMenu === id
                     ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-blue-100 hover:bg-blue-600'
@@ -82,7 +81,7 @@ export default function Sidebar({ activeMenu, onMenuChange, onLogout }: SidebarP
               >
                 <Icon size={17} strokeWidth={2} />
                 <span>{label}</span>
-              </button>
+              </a>
             </li>
           ))}
         </ul>
