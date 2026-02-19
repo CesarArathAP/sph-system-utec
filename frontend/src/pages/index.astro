@@ -1,14 +1,16 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import { AuthLayout, LoginForm } from '../components/Auth';
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { AuthLayout, LoginForm, AuthGuard } from "../components/Auth";
 ---
 
 <BaseLayout title="Iniciar Sesión - SPH System">
-	<AuthLayout
-		title="Bienvenido"
-		subtitle="Gestión inteligente de horarios escolares"
-		imageSrc="/src/assets/images/control-horario.png"
-	>
-		<LoginForm client:load />
-	</AuthLayout>
+	<AuthGuard requireAuth={false} client:load>
+		<AuthLayout
+			title="Bienvenido"
+			subtitle="Gestión inteligente de horarios escolares"
+			imageSrc="/src/assets/images/control-horario.png"
+		>
+			<LoginForm client:load />
+		</AuthLayout>
+	</AuthGuard>
 </BaseLayout>

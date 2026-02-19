@@ -17,7 +17,7 @@ export default function LoginForm() {
 
       if (response.access_token) {
         // Token guardado en authService.login(), redirigir al dashboard
-        window.location.href = '/dashboard';
+        window.location.href = '/auth/dashboard';
       } else {
         setError(response.message || 'Credenciales incorrectas');
       }
