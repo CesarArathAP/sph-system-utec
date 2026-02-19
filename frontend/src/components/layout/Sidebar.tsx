@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Home, Calendar, GraduationCap, BookOpen, Building2, Users, LogOut,
+} from 'lucide-react';
 
 interface SidebarProps {
   activeMenu: string;
@@ -14,76 +17,71 @@ interface CurrentUser {
   rol: string;
 }
 
+const menuItems = [
+  { id: 'inicio', label: 'Inicio', Icon: Home },
+  { id: 'horarios', label: 'Horarios', Icon: Calendar },
+  { id: 'profesores', label: 'Profesores', Icon: GraduationCap },
+  { id: 'materias', label: 'Materias', Icon: BookOpen },
+  { id: 'aulas', label: 'Aulas', Icon: Building2 },
+  { id: 'grupos', label: 'Grupos', Icon: Users },
+];
+
+const rolLabel: Record<string, string> = {
+  admin: 'Administrador',
+  coordinador: 'Coordinador',
+  docente: 'Docente',
+};
+
 export default function Sidebar({ activeMenu, onMenuChange, onLogout }: SidebarProps) {
   const [user, setUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
-    // Leer datos del usuario desde localStorage
     const stored = localStorage.getItem('current_user');
     if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        setUser(null);
-      }
+      try { setUser(JSON.parse(stored)); } catch { /* ignore */ }
     }
   }, []);
 
-  const menuItems = [
-    { id: 'horario', label: 'Horario' },
-    { id: 'profesores', label: 'Profesores' },
-    { id: 'materias', label: 'Materias' },
-    { id: 'aulas', label: 'Aulas' },
-    { id: 'grupos', label: 'Grupos' },
-  ];
-
-  const getRolLabel = (rol: string) => {
-    const roles: Record<string, string> = {
-      admin: 'Administrador',
-      coordinador: 'Coordinador',
-      docente: 'Docente',
-      estudiante: 'Estudiante',
-    };
-    return roles[rol] || rol;
-  };
-
   return (
-    <aside className="w-64 bg-blue-700 text-white h-screen fixed left-0 top-0 overflow-y-auto">
-      {/* Header */}
+    <aside className="w-64 bg-blue-700 text-white h-screen fixed left-0 top-0 flex flex-col">
+      {/* Logo */}
       <div className="p-6 border-b border-blue-600">
-        <h1 className="text-2xl font-bold">SPH System</h1>
-        <p className="text-blue-100 text-sm mt-1">Gestión de Horarios</p>
+        <h1 className="text-2xl font-bold tracking-tight">SPH System</h1>
+        <p className="text-blue-200 text-xs mt-1">Gestión de Horarios UTEC</p>
       </div>
 
-      {/* User Info */}
+      {/* Usuario */}
       {user && (
-        <div className="p-4 border-b border-blue-600 bg-blue-800">
+        <div className="px-4 py-3 border-b border-blue-600 bg-blue-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-lg">
+            <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center font-bold text-sm shrink-0">
               {user.nombre.charAt(0)}{user.apellido.charAt(0)}
             </div>
-            <div className="overflow-hidden">
+            <div className="min-w-0">
               <p className="font-semibold text-sm truncate">{user.nombre} {user.apellido}</p>
-              <p className="text-blue-200 text-xs truncate">{getRolLabel(user.rol)}</p>
+              <p className="text-blue-200 text-xs truncate">{rolLabel[user.rol] ?? user.rol}</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Menu */}
-      <nav className="p-4">
-        <p className="text-blue-200 text-xs uppercase font-semibold mb-4 px-2">Gestión</p>
-        <ul className="space-y-2">
-          {menuItems.map((item) => (
-            <li key={item.id}>
+      {/* Navegación */}
+      <nav className="flex-1 p-4 overflow-y-auto">
+        <p className="text-blue-300 text-xs uppercase font-semibold mb-3 px-2 tracking-wider">
+          Menú
+        </p>
+        <ul className="space-y-1">
+          {menuItems.map(({ id, label, Icon }) => (
+            <li key={id}>
               <button
-                onClick={() => onMenuChange(item.id)}
-                className={`w-full text-left px-4 py-3 rounded-lg transition flex items-center gap-3 ${activeMenu === item.id
-                    ? 'bg-blue-600 text-white font-semibold'
+                onClick={() => onMenuChange(id)}
+                className={`w-full text-left px-4 py-2.5 rounded-lg transition-all flex items-center gap-3 text-sm font-medium ${activeMenu === id
+                    ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-blue-100 hover:bg-blue-600'
                   }`}
               >
-                <span>{item.label}</span>
+                <Icon size={17} strokeWidth={2} />
+                <span>{label}</span>
               </button>
             </li>
           ))}
@@ -91,14 +89,15 @@ export default function Sidebar({ activeMenu, onMenuChange, onLogout }: SidebarP
       </nav>
 
       {/* Footer */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-600">
+      <div className="p-4 border-t border-blue-600">
         {user && (
-          <p className="text-blue-200 text-xs truncate mb-2">{user.email}</p>
+          <p className="text-blue-300 text-xs truncate mb-3">{user.email}</p>
         )}
         <button
           onClick={onLogout}
-          className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition text-sm"
+          className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition text-sm flex items-center justify-center gap-2"
         >
+          <LogOut size={15} strokeWidth={2} />
           Cerrar sesión
         </button>
       </div>
