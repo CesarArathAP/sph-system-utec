@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 
 interface Profesor {
   id?: string;
@@ -17,141 +18,180 @@ interface DisponibilidadModalProps {
 type DayOfWeek = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes';
 type TimeSlot = string;
 
+const DAYS: DayOfWeek[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+const TIME_SLOTS: TimeSlot[] = [
+  '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00',
+  '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00',
+  '14:00 - 15:00', '15:00 - 16:00', '16:00 - 17:00',
+  '17:00 - 18:00',
+];
+const BREAK_SLOTS = ['13:00 - 14:00'];
+
 export default function DisponibilidadModal({ isOpen, profesor, onClose }: DisponibilidadModalProps) {
-  const daysOfWeek: DayOfWeek[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-  const timeSlots: TimeSlot[] = [
-    '09:00 - 09:30',
-    '09:30 - 10:30',
-    '10:30 - 11:00',
-    '11:00 - 12:00',
-    '12:00 - 12:30',
-    '12:30 - 13:30',
-    '13:30 - 14:00',
-    '14:00 - 15:00',
-    '15:00 - 15:30',
-    '15:30 - 16:00',
-    '16:00 - 17:00',
-  ];
-
-  const breakTimes = ['12:30 - 13:30'];
-
   const [disponibilidad, setDisponibilidad] = useState<Record<string, Record<string, boolean>>>({});
 
-  const toggleDisponibilidad = (day: DayOfWeek, time: TimeSlot) => {
+  // Resetear al abrir con nuevo profesor
+  useEffect(() => {
+    if (!isOpen) return;
+    setDisponibilidad({});
+  }, [isOpen, profesor]);
+
+  const toggleSlot = (day: DayOfWeek, time: TimeSlot) => {
     setDisponibilidad((prev) => ({
       ...prev,
-      [day]: {
-        ...prev[day],
-        [time]: !prev[day]?.[time],
-      },
+      [day]: { ...prev[day], [time]: !prev[day]?.[time] },
     }));
   };
 
-  if (!isOpen || !profesor) return null;
+  const countSelected = () =>
+    Object.values(disponibilidad).reduce(
+      (total, day) => total + Object.values(day).filter(Boolean).length,
+      0
+    );
+
+  const handleSave = () => {
+    console.log('Disponibilidad guardada:', disponibilidad);
+    onClose();
+  };
 
   return (
-    <>
-      {/* Backdrop - Transparent */}
-      <div
-        className="fixed inset-0 z-40 transition-opacity"
-        onClick={onClose}
-      ></div>
+    <Dialog.Root open={isOpen && !!profesor} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        {/* Overlay */}
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
 
-      {/* Modal */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
-        <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto animate-in fade-in duration-200">
-          {/* Modal Header */}
-          <div className="border-b border-gray-200 p-6 flex justify-between items-center sticky top-0 bg-white">
+        {/* Contenido — ancho grande para la tabla */}
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
+                     bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh]
+                     overflow-y-auto focus:outline-none"
+          onEscapeKeyDown={onClose}
+        >
+          {/* Header */}
+          <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-start sticky top-0 bg-white rounded-t-xl">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Disponibilidad por profesor</h2>
-              <p className="text-gray-600 text-sm mt-1">{profesor.nombre}</p>
+              <Dialog.Title className="text-xl font-bold text-gray-800">
+                Disponibilidad del Profesor
+              </Dialog.Title>
+              {profesor && (
+                <p className="text-sm text-blue-600 font-medium mt-0.5">
+                  {profesor.nombre} — {profesor.departamento}
+                </p>
+              )}
             </div>
-            <button
+            <Dialog.Close
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-gray-400 hover:text-gray-700 text-2xl leading-none transition mt-1"
+              aria-label="Cerrar"
             >
               ×
-            </button>
+            </Dialog.Close>
           </div>
 
-          {/* Modal Content */}
+          {/* Cuerpo */}
           <div className="p-6">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+
+            {/* Contador */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-gray-500">
+                Haz clic en las celdas para marcar los horarios disponibles.
+              </p>
+              <span className="text-sm font-semibold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                {countSelected()} horas seleccionadas
+              </span>
+            </div>
+
+            {/* Tabla de disponibilidad */}
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 w-40">
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 w-36">
                       Horario
                     </th>
-                    {daysOfWeek.map((day) => (
-                      <th
-                        key={day}
-                        className="text-center py-3 px-4 font-semibold text-gray-700"
-                      >
+                    {DAYS.map((day) => (
+                      <th key={day} className="text-center py-3 px-4 font-semibold text-gray-600">
                         {day}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {timeSlots.map((timeSlot) => (
-                    <tr key={timeSlot} className="border-b border-gray-200 hover:bg-gray-50">
-                      <td className="py-4 px-4 font-medium text-gray-800">{timeSlot}</td>
-                      {daysOfWeek.map((day) => {
-                        const isBreak = breakTimes.includes(timeSlot);
-                        const isSelected = disponibilidad[day]?.[timeSlot];
-
-                        return (
-                          <td key={`${day}-${timeSlot}`} className="text-center py-4 px-4">
-                            {isBreak ? (
-                              <div className="text-gray-500 font-medium">Break</div>
-                            ) : (
-                              <button
-                                onClick={() => toggleDisponibilidad(day as DayOfWeek, timeSlot)}
-                                className={`w-full px-3 py-2 rounded transition ${
-                                  isSelected
-                                    ? 'bg-blue-500 text-white border-2 border-blue-600'
-                                    : 'bg-gray-100 text-gray-600 border-2 border-gray-300 hover:bg-gray-200'
-                                }`}
-                              >
-                                {isSelected ? '✓' : '-'}
-                              </button>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                  {TIME_SLOTS.map((slot, i) => {
+                    const isBreak = BREAK_SLOTS.includes(slot);
+                    return (
+                      <tr
+                        key={slot}
+                        className={`border-b border-gray-100 ${isBreak ? 'bg-amber-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                      >
+                        <td className={`py-3 px-4 font-medium text-xs ${isBreak ? 'text-amber-700' : 'text-gray-700'}`}>
+                          {slot}
+                        </td>
+                        {DAYS.map((day) => {
+                          const isSelected = disponibilidad[day]?.[slot];
+                          return (
+                            <td key={`${day}-${slot}`} className="text-center py-2 px-3">
+                              {isBreak ? (
+                                <span className="text-amber-600 text-xs font-medium">Descanso</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSlot(day, slot)}
+                                  className={`w-full py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${isSelected
+                                      ? 'bg-blue-500 text-white shadow-sm scale-105'
+                                      : 'bg-gray-100 text-gray-400 hover:bg-blue-100 hover:text-blue-600 border border-gray-200'
+                                    }`}
+                                  title={isSelected ? 'Disponible — clic para quitar' : 'No disponible — clic para marcar'}
+                                >
+                                  {isSelected ? '✓' : '–'}
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {/* Legend */}
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-gray-700">
-                <span className="font-semibold">Nota:</span> Selecciona los horarios en los que el
-                profesor está disponible para impartir clases.
-              </p>
+            {/* Leyenda */}
+            <div className="mt-4 flex gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-blue-500 rounded" />
+                <span>Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded" />
+                <span>No disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-amber-100 border border-amber-200 rounded" />
+                <span>Descanso</span>
+              </div>
             </div>
           </div>
 
-          {/* Modal Actions */}
-          <div className="flex gap-4 justify-end border-t border-gray-200 p-6 bg-gray-50">
+          {/* Footer */}
+          <div className="flex gap-4 justify-end border-t border-gray-200 px-6 py-4 bg-gray-50 rounded-b-xl">
+            <Dialog.Close asChild>
+              <button
+                type="button" onClick={onClose}
+                className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
+              >
+                Cancelar
+              </button>
+            </Dialog.Close>
             <button
-              onClick={onClose}
-              className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onClose}
+              type="button" onClick={handleSave}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition"
             >
-              Guardar
+              Guardar disponibilidad
             </button>
           </div>
-        </div>
-      </div>
-    </>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
