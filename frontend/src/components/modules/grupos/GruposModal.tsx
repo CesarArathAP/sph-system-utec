@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 
 interface Grupo {
   id?: string;
@@ -19,40 +20,24 @@ interface GruposModalProps {
 }
 
 export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposModalProps) {
-  const [formData, setFormData] = useState<Grupo>({
-    codigo: '',
-    nombre: '',
-    carrera: '',
-    semestre: 0,
-    turno: '',
-    numeroEstudiantes: 0,
-    cicloEscolar: '',
-  });
+  const emptyForm: Grupo = {
+    codigo: '', nombre: '', carrera: '',
+    semestre: 1, turno: '', numeroEstudiantes: 0, cicloEscolar: '',
+  };
+
+  const [formData, setFormData] = useState<Grupo>(emptyForm);
 
   useEffect(() => {
-    if (grupo) {
-      setFormData(grupo);
-    } else {
-      setFormData({
-        codigo: '',
-        nombre: '',
-        carrera: '',
-        semestre: 0,
-        turno: '',
-        numeroEstudiantes: 0,
-        cicloEscolar: '',
-      });
-    }
+    setFormData(grupo ?? emptyForm);
   }, [grupo, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        name === 'semestre' || name === 'numeroEstudiantes'
-          ? parseInt(value) || 0
-          : value,
+      [name]: name === 'semestre' || name === 'numeroEstudiantes'
+        ? parseInt(value) || 0
+        : value,
     }));
   };
 
@@ -61,166 +46,154 @@ export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposMo
     onSave(formData);
   };
 
-  if (!isOpen) return null;
+  const isEditing = !!grupo?.id;
 
   return (
-    <>
-      {/* Backdrop - Transparent */}
-      <div
-        className="fixed inset-0 z-40 transition-opacity"
-        onClick={onClose}
-      ></div>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        {/* Overlay */}
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
 
-      {/* Modal */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
-        <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto animate-in fade-in duration-200">
-          {/* Modal Header */}
-          <div className="border-b border-gray-200 p-6 sticky top-0 bg-white">
-            {grupo ? (
-              <h2 className="text-2xl font-bold text-gray-800 text-center">Editar Grupo</h2>
-            ) : (
-              <h2 className="text-2xl font-bold text-gray-800 text-center">Crear Grupo</h2>
-            )}
+        {/* Contenido */}
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
+                     bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh]
+                     overflow-y-auto focus:outline-none"
+          onEscapeKeyDown={onClose}
+        >
+          {/* Header */}
+          <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 bg-white rounded-t-xl">
+            <Dialog.Title className="text-xl font-bold text-gray-800">
+              {isEditing ? 'Editar Grupo' : 'Crear Grupo'}
+            </Dialog.Title>
+            <Dialog.Close
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-700 text-2xl leading-none transition"
+              aria-label="Cerrar"
+            >
+              ×
+            </Dialog.Close>
           </div>
 
-          {/* Modal Content */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* Box container */}
-            <div className="border-2 border-gray-200 rounded-lg p-6 space-y-4">
-              {/* Código */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Codigo
-                </label>
-                <input
-                  type="text"
-                  name="codigo"
-                  value={formData.codigo}
-                  onChange={handleChange}
-                  placeholder="ej. IDyGS-3A"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+          {/* Formulario */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
 
-              {/* Nombre */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre
-                </label>
-                <input
-                  type="text"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleChange}
-                  placeholder="ej. Ingeniería en Desarrollo y gestión de software - 3er Semestre A"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+            {/* Código */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Código
+              </label>
+              <input
+                type="text" name="codigo"
+                value={formData.codigo} onChange={handleChange}
+                placeholder="ej. IDyGS-3A" required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
 
-              {/* Carrera */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Carrera
-                </label>
-                <input
-                  type="text"
-                  name="carrera"
-                  value={formData.carrera}
-                  onChange={handleChange}
-                  placeholder="ej. Ingeniería en Sistemas Computacionales"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+            {/* Nombre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nombre
+              </label>
+              <input
+                type="text" name="nombre"
+                value={formData.nombre} onChange={handleChange}
+                placeholder="ej. Ingeniería en Desarrollo de Software - 3A" required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
 
-              {/* Semestre */}
+            {/* Carrera */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Carrera
+              </label>
+              <input
+                type="text" name="carrera"
+                value={formData.carrera} onChange={handleChange}
+                placeholder="ej. Ingeniería en Sistemas Computacionales" required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
+
+            {/* Semestre + N° Estudiantes */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Semestre
                 </label>
                 <input
-                  type="number"
-                  name="semestre"
-                  value={formData.semestre}
-                  onChange={handleChange}
-                  placeholder="ej. 3"
-                  min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  type="number" name="semestre"
+                  value={formData.semestre} onChange={handleChange}
+                  placeholder="ej. 3" min="1" max="12" required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
-
-              {/* Turno */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Turno
+                  Número de estudiantes
                 </label>
                 <input
-                  type="text"
-                  name="turno"
-                  value={formData.turno}
-                  onChange={handleChange}
-                  placeholder="ej. Matutino, Vespertino"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              {/* Número de estudiantes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Numero de estudiantes
-                </label>
-                <input
-                  type="number"
-                  name="numeroEstudiantes"
-                  value={formData.numeroEstudiantes}
-                  onChange={handleChange}
-                  placeholder="ej. 28"
-                  min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              {/* Ciclo escolar */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ciclo escolar
-                </label>
-                <input
-                  type="text"
-                  name="cicloEscolar"
-                  value={formData.cicloEscolar}
-                  onChange={handleChange}
-                  placeholder="ej. 2026-1"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  type="number" name="numeroEstudiantes"
+                  value={formData.numeroEstudiantes} onChange={handleChange}
+                  placeholder="ej. 28" min="0" required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
             </div>
 
-            {/* Modal Actions */}
-            <div className="flex gap-4 justify-end pt-6">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition"
+            {/* Turno */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Turno
+              </label>
+              <select
+                name="turno"
+                value={formData.turno} onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
               >
-                Cancelar
-              </button>
+                <option value="">Selecciona un turno</option>
+                <option value="matutino">Matutino</option>
+                <option value="vespertino">Vespertino</option>
+                <option value="nocturno">Nocturno</option>
+              </select>
+            </div>
+
+            {/* Ciclo escolar */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ciclo escolar
+              </label>
+              <input
+                type="text" name="cicloEscolar"
+                value={formData.cicloEscolar} onChange={handleChange}
+                placeholder="ej. 2026-1" required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-4 justify-end border-t border-gray-200 pt-5">
+              <Dialog.Close asChild>
+                <button
+                  type="button" onClick={onClose}
+                  className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition"
+                >
+                  Cancelar
+                </button>
+              </Dialog.Close>
               <button
                 type="submit"
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition"
               >
-                Guardar
+                {isEditing ? 'Actualizar' : 'Guardar'}
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
