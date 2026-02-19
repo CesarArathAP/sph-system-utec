@@ -1,17 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-
-interface Profesor {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  departamento: string;
-  horasMaximas: number;
-}
+import type { Docente } from './ProfesoresLayout';
 
 interface DisponibilidadModalProps {
   isOpen: boolean;
-  profesor: Profesor | null;
+  docente: Docente | null;
   onClose: () => void;
 }
 
@@ -27,14 +20,14 @@ const TIME_SLOTS: TimeSlot[] = [
 ];
 const BREAK_SLOTS = ['13:00 - 14:00'];
 
-export default function DisponibilidadModal({ isOpen, profesor, onClose }: DisponibilidadModalProps) {
+export default function DisponibilidadModal({ isOpen, docente, onClose }: DisponibilidadModalProps) {
   const [disponibilidad, setDisponibilidad] = useState<Record<string, Record<string, boolean>>>({});
 
-  // Resetear al abrir con nuevo profesor
+  // Resetear al abrir con nuevo docente
   useEffect(() => {
     if (!isOpen) return;
     setDisponibilidad({});
-  }, [isOpen, profesor]);
+  }, [isOpen, docente]);
 
   const toggleSlot = (day: DayOfWeek, time: TimeSlot) => {
     setDisponibilidad((prev) => ({
@@ -55,7 +48,7 @@ export default function DisponibilidadModal({ isOpen, profesor, onClose }: Dispo
   };
 
   return (
-    <Dialog.Root open={isOpen && !!profesor} onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root open={isOpen && !!docente} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         {/* Overlay */}
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
@@ -71,11 +64,12 @@ export default function DisponibilidadModal({ isOpen, profesor, onClose }: Dispo
           <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-start sticky top-0 bg-white rounded-t-xl">
             <div>
               <Dialog.Title className="text-xl font-bold text-gray-800">
-                Disponibilidad del Profesor
+                Disponibilidad del Docente
               </Dialog.Title>
-              {profesor && (
+              {docente && (
                 <p className="text-sm text-blue-600 font-medium mt-0.5">
-                  {profesor.nombre} — {profesor.departamento}
+                  {docente.codigo_docente}
+                  {docente.departamento ? ` — ${docente.departamento}` : ''}
                 </p>
               )}
             </div>
