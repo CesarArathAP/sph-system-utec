@@ -256,3 +256,37 @@ def add_disponibilidad(
     db.refresh(docente)
     
     return docente
+
+
+def replace_disponibilidad(
+    db: Session,
+    docente_id: int,
+    disponibilidades: List[DisponibilidadCreate]
+) -> Docente:
+    """
+    Reemplazar TODA la disponibilidad de un docente.
+
+    Elimina todos los bloques existentes e inserta los nuevos.
+    Si la lista llega vacía, el docente queda sin disponibilidad.
+    """
+    docente = get_docente_by_id(db, docente_id)
+
+    # 1. Borrar todo lo existente
+    db.query(DisponibilidadDocente).filter(
+        DisponibilidadDocente.docente_id == docente_id
+    ).delete(synchronize_session=False)
+
+    # 2. Insertar los nuevos
+    for disp_data in disponibilidades:
+        disponibilidad = DisponibilidadDocente(
+            docente_id=docente_id,
+            dia_semana=disp_data.dia_semana,
+            hora_inicio=disp_data.hora_inicio,
+            hora_fin=disp_data.hora_fin,
+        )
+        db.add(disponibilidad)
+
+    db.commit()
+    db.refresh(docente)
+
+    return docente

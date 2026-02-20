@@ -131,3 +131,21 @@ def add_disponibilidad(
     - **hora_fin**: Hora de fin de disponibilidad
     """
     return docente_service.add_disponibilidad(db, docente_id, disponibilidades)
+
+
+@router.put("/{docente_id}/disponibilidad", response_model=DocenteResponse)
+def replace_disponibilidad(
+    docente_id: int,
+    disponibilidades: list[DisponibilidadCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_coordinador)
+):
+    """
+    Reemplazar la disponibilidad horaria de un docente.
+
+    Requiere rol de coordinador o admin.
+
+    Elimina **todos** los bloques actuales e inserta la nueva lista.
+    Para dejar al docente sin disponibilidad, enviar una lista vacía `[]`.
+    """
+    return docente_service.replace_disponibilidad(db, docente_id, disponibilidades)

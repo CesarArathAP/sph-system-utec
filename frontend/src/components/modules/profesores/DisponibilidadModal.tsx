@@ -86,8 +86,9 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
     });
 
     try {
+      // PUT reemplaza TODA la disponibilidad (borra las anteriores e inserta las nuevas)
       const res = await fetch(`${BASE}/${docente.id}/disponibilidad`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
@@ -207,8 +208,8 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
                               type="button"
                               onClick={() => toggleSlot(day.value, slot.inicio)}
                               className={`w-full py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${isSelected
-                                  ? 'bg-blue-500 text-white shadow-sm scale-105'
-                                  : 'bg-gray-100 text-gray-400 hover:bg-blue-100 hover:text-blue-600 border border-gray-200'
+                                ? 'bg-blue-500 text-white shadow-sm scale-105'
+                                : 'bg-gray-100 text-gray-400 hover:bg-blue-100 hover:text-blue-600 border border-gray-200'
                                 }`}
                               title={isSelected ? 'Disponible — clic para quitar' : 'No disponible — clic para marcar'}
                             >
