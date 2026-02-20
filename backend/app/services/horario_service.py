@@ -515,3 +515,26 @@ def resolve_conflict(db: Session, conflicto_id: int) -> dict:
     db.refresh(conflicto)
     
     return conflicto
+
+
+def clear_conflicts(db: Session, todos: bool = False) -> int:
+    """
+    Eliminar conflictos del historial.
+
+    Args:
+        db: Sesión de base de datos
+        todos: Si True, elimina todos los conflictos; si False, solo los resueltos.
+
+    Returns:
+        Número de filas eliminadas.
+    """
+    from app.models import Conflicto
+
+    query = db.query(Conflicto)
+    if not todos:
+        query = query.filter(Conflicto.resuelto == True)
+
+    count = query.count()
+    query.delete(synchronize_session=False)
+    db.commit()
+    return count

@@ -84,6 +84,7 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [conflictos, setConflictos] = useState<ConflictoRegistrado[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingConf, setLoadingConf] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterDia, setFilterDia] = useState<string>('');
   const [cicloInput, setCicloInput] = useState('');
@@ -138,7 +139,30 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
     } catch {
       alert('Error al resolver el conflicto');
     }
+  };  /* ── Limpiar historial de conflictos ───────────────────────────────── */
+  const clearConflicts = async (todos = false) => {
+    const msg = todos
+      ? '¿Eliminar TODOS los conflictos (resueltos y pendientes)? Esta acción no se puede deshacer.'
+      : '¿Eliminar solo los conflictos ya resueltos del historial?';
+    if (!confirm(msg)) return;
+
+    setClearing(true);
+    try {
+      const res = await fetch(
+        `${BASE}/horarios/conflicts/clear${todos ? '?todos=true' : ''}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      alert(data.mensaje);
+      fetchConflictos();
+    } catch {
+      alert('Error al limpiar el historial de conflictos');
+    } finally {
+      setClearing(false);
+    }
   };
+
 
   useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
   useEffect(() => { fetchConflictos(); }, [fetchConflictos]);
@@ -351,7 +375,7 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
                 Conflictos detectados
               </div>
               <div className="flex items-center gap-2">
-                {loadingConf
+                {loadingConf || clearing
                   ? <RefreshCw size={13} className="animate-spin text-red-200" />
                   : (
                     <button onClick={fetchConflictos} title="Refrescar conflictos"
@@ -360,6 +384,37 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
                     </button>
                   )
                 }
+                {/* Dropdown Limpiar */}
+                <div className="relative group">
+                  <button
+                    title="Limpiar historial"
+                    disabled={clearing || conflictos.length === 0}
+                    className="text-red-200 hover:text-white transition text-xs font-semibold px-2 py-0.5 rounded border border-red-400 hover:border-red-200 disabled:opacity-40"
+                  >
+                    Limpiar ▾
+                  </button>
+                  {/* Menú desplegable */}
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-50
+                                  invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
+                    <button
+                      type="button"
+                      onClick={() => clearConflicts(false)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"
+                    >
+                      <span className="text-green-500">✓</span>
+                      Limpiar resueltos
+                    </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      type="button"
+                      onClick={() => clearConflicts(true)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-lg font-medium"
+                    >
+                      <span>⚠</span>
+                      Limpiar todo el historial
+                    </button>
+                  </div>
+                </div>
                 {conflictos.length > 0 && (
                   <span className="bg-white text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
                     {conflictos.length}
@@ -379,8 +434,8 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
                   <div key={c.id} className={`px-3 py-3 transition ${c.resuelto ? 'bg-green-50' : 'bg-white'}`}>
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${c.resuelto
-                          ? 'bg-green-100 text-green-700'
-                          : CONFLICTO_COLORS[c.tipo_conflicto] ?? 'bg-gray-100 text-gray-600'
+                        ? 'bg-green-100 text-green-700'
+                        : CONFLICTO_COLORS[c.tipo_conflicto] ?? 'bg-gray-100 text-gray-600'
                         }`}>
                         {c.tipo_conflicto.replace('_', ' ')}
                       </span>

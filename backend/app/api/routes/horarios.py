@@ -199,3 +199,23 @@ def resolve_conflict(
     manteniendo un historial completo de conflictos.
     """
     return horario_service.resolve_conflict(db, conflicto_id)
+
+
+@router.delete("/conflicts/clear")
+def clear_conflicts(
+    todos: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """
+    Limpiar el historial de conflictos registrados.
+
+    Requiere rol de admin.
+
+    - **todos=false** (defecto): elimina solo los conflictos ya **resueltos**.
+    - **todos=true**: elimina **todos** los conflictos (resueltos y pendientes).
+
+    Devuelve el número de registros eliminados.
+    """
+    eliminados = horario_service.clear_conflicts(db, todos=todos)
+    return {"eliminados": eliminados, "mensaje": f"Se eliminaron {eliminados} conflicto(s) del historial."}
