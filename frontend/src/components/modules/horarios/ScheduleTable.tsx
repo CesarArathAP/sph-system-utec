@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus } from 'lucide-react';
+import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus, Eye } from 'lucide-react';
 import { API_CONFIG } from '../../../services/config';
+import HorarioDetailModal from './HorarioDetailModal';
 
 /* ── Tipos ─────────────────────────────────────────────────────────── */
 interface HorarioResponse {
@@ -89,6 +90,7 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [filterDia, setFilterDia] = useState<string>('');
   const [cicloInput, setCicloInput] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   /* ── Fetch horarios ───────────────────────────────────────────────── */
   const fetchHorarios = useCallback(async () => {
@@ -208,7 +210,9 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
               const di = DAYS.findIndex(d => d.value === a.dia_semana) - DAYS.findIndex(d => d.value === b.dia_semana);
               return di !== 0 ? di : a.hora_inicio.localeCompare(b.hora_inicio);
             }).map((h) => (
-              <tr key={h.id} className={`hover:bg-gray-50 transition ${!h.activo ? 'opacity-40' : ''}`}>
+              <tr key={h.id}
+                onClick={() => setDetailId(h.id)}
+                className={`hover:bg-blue-50 cursor-pointer transition ${!h.activo ? 'opacity-40' : ''}`}>
                 <td className="px-4 py-3 capitalize text-gray-700">{h.dia_semana}</td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">
                   {h.hora_inicio.slice(0, 5)} – {h.hora_fin.slice(0, 5)}
@@ -271,7 +275,8 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
                       {cellItems.map((h, idx) => (
                         <div
                           key={`${h.id}-${idx}`}
-                          className={`rounded border px-1.5 py-1 mb-0.5 leading-tight cursor-default ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 border-gray-200 text-gray-700'}`}
+                          onClick={() => setDetailId(h.id)}
+                          className={`rounded border px-1.5 py-1 mb-0.5 leading-tight cursor-pointer hover:brightness-95 transition-all ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 border-gray-200 text-gray-700'}`}
                           title={`${h.asignacion?.materia?.nombre ?? ''} · ${h.asignacion?.grupo?.nombre ?? ''} · ${h.aula?.nombre ?? ''}`}
                         >
                           <div className="font-semibold truncate max-w-[120px]">
@@ -456,7 +461,12 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
                     </div>
                     <p className="text-xs text-gray-700 leading-tight">{c.descripcion}</p>
                     {c.horario_id && (
-                      <p className="text-[10px] text-gray-400 mt-1">Horario #{c.horario_id}</p>
+                      <button
+                        onClick={() => setDetailId(c.horario_id!)}
+                        className="text-[10px] text-blue-500 hover:underline mt-1 flex items-center gap-1"
+                      >
+                        <Eye size={10} /> Ver horario #{c.horario_id}
+                      </button>
                     )}
                   </div>
                 ))
@@ -474,6 +484,12 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
           </div>
         </div>
       )}
+
+      {/* Modal de detalle de horario */}
+      <HorarioDetailModal
+        horarioId={detailId}
+        onClose={() => setDetailId(null)}
+      />
     </div>
   );
 }
