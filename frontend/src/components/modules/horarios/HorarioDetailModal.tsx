@@ -126,7 +126,7 @@ export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Prop
             try {
                 const [resH, resA] = await Promise.all([
                     fetch(`${BASE}/horarios/${horarioId}`, { headers: { Authorization: `Bearer ${getToken()}` } }),
-                    fetch(`${BASE}/aulas?page=1&page_size=200`, { headers: { Authorization: `Bearer ${getToken()}` } }),
+                    fetch(`${BASE}/aulas?page=1&page_size=100&activo=true`, { headers: { Authorization: `Bearer ${getToken()}` } }),
                 ]);
                 if (!resH.ok) throw new Error(`Error ${resH.status}`);
                 const h: HorarioDetail = await resH.json();
