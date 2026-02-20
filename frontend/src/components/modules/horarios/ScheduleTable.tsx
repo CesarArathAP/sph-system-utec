@@ -22,11 +22,14 @@ interface HorarioResponse {
   aula?: { nombre: string; codigo_aula: string };
 }
 
-interface ConflictoDetectado {
-  tipo: string;
+interface ConflictoRegistrado {
+  id: number;
+  horario_id?: number | null;
+  tipo_conflicto: string;
   descripcion: string;
-  horario1_id?: number;
-  horario2_id?: number;
+  resuelto: boolean;
+  created_at: string;
+  resolved_at?: string | null;
 }
 
 /* ── Constantes del grid ────────────────────────────────────────────── */
@@ -78,7 +81,7 @@ interface ScheduleTableProps {
 
 export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: ScheduleTableProps) {
   const [horarios, setHorarios] = useState<HorarioResponse[]>([]);
-  const [conflictos, setConflictos] = useState<ConflictoDetectado[]>([]);
+  const [conflictos, setConflictos] = useState<ConflictoRegistrado[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingConf, setLoadingConf] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,22 +108,37 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
     }
   }, [filterDia, refreshKey]);
 
-  /* ── Fetch conflictos ─────────────────────────────────────────────── */
+  /* ── Fetch conflictos registrados ───────────────────────────────────── */
   const fetchConflictos = useCallback(async () => {
     setLoadingConf(true);
     try {
-      const params = cicloInput ? `?ciclo_escolar=${encodeURIComponent(cicloInput)}` : '';
-      const res = await fetch(`${BASE}/horarios/conflicts${params}`, {
+      // Usamos el endpoint de conflictos REGISTRADOS (tienen ID para poder resolverlos)
+      const res = await fetch(`${BASE}/horarios/registered-conflicts/list?page=1&page_size=100`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) throw new Error();
-      setConflictos(await res.json());
+      const data = await res.json();
+      setConflictos(data.conflictos ?? []);
     } catch {
       setConflictos([]);
     } finally {
       setLoadingConf(false);
     }
-  }, [cicloInput]);
+  }, []);
+
+  /* ── Marcar conflicto como resuelto ─────────────────────────────────── */
+  const resolveConflict = async (conflictoId: number) => {
+    try {
+      const res = await fetch(`${BASE}/horarios/conflicts/${conflictoId}/resolve`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchConflictos();   // refrescar panel
+    } catch {
+      alert('Error al resolver el conflicto');
+    }
+  };
 
   useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
   useEffect(() => { fetchConflictos(); }, [fetchConflictos]);
@@ -354,21 +372,36 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
               {conflictos.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-sm text-gray-400">
                   <CheckCircle size={28} className="text-green-400" />
-                  Sin conflictos detectados
+                  Sin conflictos registrados
                 </div>
               ) : (
-                conflictos.map((c, i) => (
-                  <div key={i} className="px-3 py-3">
-                    <div className="flex items-start gap-2 mb-1">
-                      <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${CONFLICTO_COLORS[c.tipo] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {c.tipo.replace('_', ' ')}
+                conflictos.map((c) => (
+                  <div key={c.id} className={`px-3 py-3 transition ${c.resuelto ? 'bg-green-50' : 'bg-white'}`}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${c.resuelto
+                          ? 'bg-green-100 text-green-700'
+                          : CONFLICTO_COLORS[c.tipo_conflicto] ?? 'bg-gray-100 text-gray-600'
+                        }`}>
+                        {c.tipo_conflicto.replace('_', ' ')}
                       </span>
+                      {/* Botón Resolver */}
+                      {!c.resuelto && (
+                        <button
+                          type="button"
+                          onClick={() => resolveConflict(c.id)}
+                          title="Marcar como resuelto"
+                          className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                        >
+                          ✓ Resolver
+                        </button>
+                      )}
+                      {c.resuelto && (
+                        <span className="shrink-0 text-[10px] text-green-600 font-semibold">✓ Resuelto</span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-700 leading-tight">{c.descripcion}</p>
-                    {(c.horario1_id || c.horario2_id) && (
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        Horarios #{c.horario1_id} {c.horario2_id ? `y #${c.horario2_id}` : ''}
-                      </p>
+                    {c.horario_id && (
+                      <p className="text-[10px] text-gray-400 mt-1">Horario #{c.horario_id}</p>
                     )}
                   </div>
                 ))
@@ -377,8 +410,10 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
 
             <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 text-xs text-gray-500 flex justify-between">
               <span>Total: {conflictos.length}</span>
-              <span className={conflictos.length > 0 ? 'text-red-500 font-medium' : 'text-green-600'}>
-                {conflictos.length > 0 ? `⚠ ${conflictos.length} pendiente(s)` : '✓ Todo OK'}
+              <span className={conflictos.filter(c => !c.resuelto).length > 0 ? 'text-red-500 font-medium' : 'text-green-600'}>
+                {conflictos.filter(c => !c.resuelto).length > 0
+                  ? `⚠ ${conflictos.filter(c => !c.resuelto).length} pendiente(s)`
+                  : '✓ Todo OK'}
               </span>
             </div>
           </div>
