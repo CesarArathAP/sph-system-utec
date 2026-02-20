@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import engine, Base
 
 # Importar routers
-from app.api.routes import auth, docentes, materias, grupos, aulas, asignaciones, horarios, schedule
+from app.api.routes import auth, docentes, materias, grupos, aulas, asignaciones, horarios, schedule, users
 
 
 # Crear tablas en la base de datos
@@ -51,3 +51,4 @@ app.include_router(aulas.router, prefix=f"{settings.API_V1_STR}/aulas", tags=["a
 app.include_router(asignaciones.router, prefix=f"{settings.API_V1_STR}/asignaciones", tags=["asignaciones"])
 app.include_router(horarios.router, prefix=f"{settings.API_V1_STR}/horarios", tags=["horarios"])
 app.include_router(schedule.router, prefix=f"{settings.API_V1_STR}/schedule", tags=["schedule"])
+app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
