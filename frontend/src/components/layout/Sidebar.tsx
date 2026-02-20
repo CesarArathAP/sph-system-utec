@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 import {
   Home, Calendar, GraduationCap, BookOpen, Building2, Users, LogOut, BookCopy,
 } from 'lucide-react';
@@ -41,6 +42,23 @@ export default function Sidebar({ activeMenu, onLogout }: SidebarProps) {
       try { setUser(JSON.parse(stored)); } catch { /* ignore */ }
     }
   }, []);
+
+  const handleLogout = () => {
+    Swal.fire({
+      title: '¿Cerrar sesión?',
+      text: 'Tu sesión actual se cerrará y tendrás que iniciar sesión de nuevo.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#3b82f6',
+      confirmButtonText: 'Sí, cerrar sesión',
+      cancelButtonText: 'Cancelar',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        onLogout();
+      }
+    });
+  };
 
   return (
     <aside className="w-64 bg-blue-700 text-white h-screen fixed left-0 top-0 flex flex-col">
@@ -94,7 +112,7 @@ export default function Sidebar({ activeMenu, onLogout }: SidebarProps) {
           <p className="text-blue-300 text-xs truncate mb-3">{user.email}</p>
         )}
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition text-sm flex items-center justify-center gap-2"
         >
           <LogOut size={15} strokeWidth={2} />
