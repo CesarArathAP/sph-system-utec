@@ -70,6 +70,20 @@ def upgrade() -> None:
     op.create_index(op.f('ix_materias_activo'), 'materias', ['activo'], unique=False)
     op.create_index(op.f('ix_materias_codigo_materia'), 'materias', ['codigo_materia'], unique=True)
     op.create_index(op.f('ix_materias_id'), 'materias', ['id'], unique=False)
+    op.create_table('users',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('email', sa.String(length=255), nullable=False),
+    sa.Column('hashed_password', sa.String(length=255), nullable=False),
+    sa.Column('nombre', sa.String(length=100), nullable=False),
+    sa.Column('apellido', sa.String(length=100), nullable=False),
+    sa.Column('role', sa.String(length=50), nullable=False, server_default='user'),
+    sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
     op.create_table('docentes',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -177,6 +191,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_docentes_id'), table_name='docentes')
     op.drop_index(op.f('ix_docentes_codigo_docente'), table_name='docentes')
     op.drop_table('docentes')
+    op.drop_index(op.f('ix_users_id'), table_name='users')
+    op.drop_index(op.f('ix_users_email'), table_name='users')
+    op.drop_table('users')
     op.drop_index(op.f('ix_materias_id'), table_name='materias')
     op.drop_index(op.f('ix_materias_codigo_materia'), table_name='materias')
     op.drop_index(op.f('ix_materias_activo'), table_name='materias')
