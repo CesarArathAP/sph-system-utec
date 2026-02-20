@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { RefreshCw, ClipboardList, Wand2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { RefreshCw, ClipboardList, Wand2, AlertTriangle, CheckCircle, Clock, BarChart2 } from 'lucide-react';
+
 import { API_CONFIG } from '../../../services/config';
 
 interface AssignmentModalProps {
@@ -74,6 +75,13 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
   const [loadingData, setLoadingData] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorManual, setErrorManual] = useState<string | null>(null);
+  const [disponibilidadError, setDisponibilidadError] = useState<{
+    dia: string; franjas_disponibles: string; sugerencia: string;
+  } | null>(null);
+  const [horasMaxError, setHorasMaxError] = useState<{
+    limite: number; horas_actuales: number; horas_nuevas: number; horas_totales: number; sugerencia: string;
+  } | null>(null);
+
 
   /* ── Tab Automático ─────────────────────────────────────────────── */
   const [ciclo, setCiclo] = useState('');
@@ -118,7 +126,7 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
     if (!form.asignacion_id || !form.aula_id) {
       setErrorManual('Debes seleccionar una asignación y un aula'); return;
     }
-    setSaving(true); setErrorManual(null);
+    setSaving(true); setErrorManual(null); setDisponibilidadError(null); setHorasMaxError(null);
     try {
       const res = await fetch(`${BASE}/horarios`, {
         method: 'POST',
@@ -134,7 +142,14 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.detail ?? `Error ${res.status}`);
+        const detail = err?.detail;
+        if (detail && typeof detail === 'object' && detail.mensaje) {
+          setErrorManual(detail.mensaje);
+          if (detail.disponibilidad_docente) setDisponibilidadError(detail.disponibilidad_docente);
+          if (detail.horas_maximas) setHorasMaxError(detail.horas_maximas);
+          return;
+        }
+        throw new Error(typeof detail === 'string' ? detail : `Error ${res.status}`);
       }
       onSaved?.();
       onClose();
@@ -239,8 +254,40 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
               ) : (
                 <form onSubmit={handleManualSubmit} className="space-y-4">
                   {errorManual && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
-                      {errorManual}
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm flex gap-2 items-start">
+                      <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                      <span>{errorManual}</span>
+                    </div>
+                  )}
+                  {disponibilidadError && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm space-y-1">
+                      <p className="font-semibold text-amber-800 flex items-center gap-1.5">
+                        <Clock size={13} /> Disponibilidad el {disponibilidadError.dia}
+                      </p>
+                      <p className="text-amber-700 text-xs leading-relaxed">
+                        {disponibilidadError.sugerencia}
+                      </p>
+                    </div>
+                  )}
+                  {horasMaxError && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-2">
+                      <p className="font-semibold text-purple-800 flex items-center gap-1.5">
+                        <BarChart2 size={13} /> Límite de horas semanales
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="bg-white border border-purple-100 rounded-lg py-1.5">
+                          <p className="font-bold text-gray-700">{horasMaxError.horas_actuales}h</p>
+                          <p className="text-gray-400">actuales</p>
+                        </div>
+                        <div className="bg-white border border-purple-100 rounded-lg py-1.5">
+                          <p className="font-bold text-orange-500">+{horasMaxError.horas_nuevas}h</p>
+                          <p className="text-gray-400">nuevas</p>
+                        </div>
+                        <div className="bg-white border border-red-100 rounded-lg py-1.5">
+                          <p className="font-bold text-red-500">{horasMaxError.horas_totales}h</p>
+                          <p className="text-gray-400">de {horasMaxError.limite}h</p>
+                        </div>
+                      </div>
                     </div>
                   )}
 

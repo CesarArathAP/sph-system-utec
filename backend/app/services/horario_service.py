@@ -7,8 +7,13 @@ from fastapi import HTTPException, status
 from typing import Optional
 from datetime import time
 
-from app.models import Horario, Asignacion, Aula, Grupo, Materia, Docente
+from app.models import Horario, Asignacion, Aula, Grupo, Materia, Docente, DisponibilidadDocente
 from app.schemas.horario import HorarioCreate, HorarioUpdate, ConflictoResponse
+
+DIAS_ES = {
+    "lunes": "lunes", "martes": "martes", "miercoles": "miércoles",
+    "jueves": "jueves", "viernes": "viernes", "sabado": "sábado",
+}
 
 
 def get_horarios(
@@ -216,6 +221,180 @@ def check_conflicts(
     return conflictos
 
 
+def check_docente_disponibilidad(
+    db: Session,
+    docente_id: int,
+    dia_semana: str,
+    hora_inicio: time,
+    hora_fin: time,
+) -> None:
+    """
+    Verifica que el docente tenga disponibilidad registrada que cubra
+    completamente el bloque [hora_inicio, hora_fin) del día dado.
+
+    Si el docente no tiene disponibilidad registrada en absoluto se permite
+    (no se bloquea, sólo se valida cuando hay registros de disponibilidad).
+
+    Raises:
+        HTTPException 422 con mensaje descriptivo y los slots disponibles
+        del docente en ese día si el bloque solicitado no está cubierto.
+    """
+    slots_dia = (
+        db.query(DisponibilidadDocente)
+        .join(Docente, DisponibilidadDocente.docente_id == Docente.id)
+        .filter(
+            DisponibilidadDocente.docente_id == docente_id,
+            DisponibilidadDocente.dia_semana == dia_semana,
+        )
+        .order_by(DisponibilidadDocente.hora_inicio)
+        .all()
+    )
+
+    # Si no hay disponibilidad registrada para ese día, dejar pasar
+    if not slots_dia:
+        return
+
+    # Obtener datos del docente para el mensaje
+    docente = db.query(Docente).filter(Docente.id == docente_id).first()
+    docente_nombre = "el docente"
+    if docente and docente.user:
+        docente_nombre = f"{docente.user.nombre} {docente.user.apellido}"
+
+    # ── Verificar que el bloque esté cubierto por la disponibilidad ──
+    # El bloque [hora_inicio, hora_fin) debe estar completamente cubierto
+    # por la unión de los slots de disponibilidad.
+    bloques_cubiertos = False
+    h_ini = hora_inicio
+    h_fin = hora_fin
+
+    # Recorremos los slots en orden; unimos aquellos que sean contiguos
+    cursor = None  # hora hasta la que hemos cubierto
+    for slot in slots_dia:
+        slot_ini = slot.hora_inicio if isinstance(slot.hora_inicio, time) else time.fromisoformat(str(slot.hora_inicio))
+        slot_fin = slot.hora_fin   if isinstance(slot.hora_fin,   time) else time.fromisoformat(str(slot.hora_fin))
+
+        if slot_ini <= h_ini:
+            # Este slot cubre al menos el inicio
+            cursor = slot_fin if cursor is None else max(cursor, slot_fin)
+        elif cursor is not None and slot_ini <= cursor:
+            # Extiende la cobertura continua
+            cursor = max(cursor, slot_fin)
+
+    if cursor is not None and cursor >= h_fin:
+        bloques_cubiertos = True
+
+    if bloques_cubiertos:
+        return  # ✓ Todo bien
+
+    # ── Construir mensaje de error con los slots disponibles ──
+    dia_legible = DIAS_ES.get(dia_semana, dia_semana)
+    slots_txt = ", ".join(
+        f"{str(s.hora_inicio)[:5]}–{str(s.hora_fin)[:5]}"
+        for s in slots_dia
+    )
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            "mensaje": (
+                f"No se puede crear el horario: {docente_nombre} no tiene disponibilidad "
+                f"registrada el {dia_legible} de "
+                f"{str(hora_inicio)[:5]} a {str(hora_fin)[:5]}."
+            ),
+            "disponibilidad_docente": {
+                "dia": dia_legible,
+                "franjas_disponibles": slots_txt or "ninguna",
+                "sugerencia": (
+                    f"Puede dar clase el {dia_legible} en los siguientes rangos: "
+                    f"{slots_txt}" if slots_txt else
+                    f"{docente_nombre} no tiene ninguna franja disponible el {dia_legible}."
+                ),
+            },
+        },
+    )
+
+
+def check_horas_maximas_docente(
+    db: Session,
+    docente_id: int,
+    hora_inicio: time,
+    hora_fin: time,
+    exclude_horario_id: int | None = None,
+) -> None:
+    """
+    Verifica que asignar el bloque [hora_inicio, hora_fin] al docente
+    no supere su límite de horas_maximas_semana.
+
+    Suma las duraciones de todos los horarios activos del docente
+    (sin contar el excluido, para ediciones) y compara con el límite.
+
+    Raises:
+        HTTPException 422 con mensaje descriptivo si se supera el límite.
+    """
+    from datetime import datetime as dt
+
+    docente = db.query(Docente).filter(Docente.id == docente_id).first()
+    if not docente:
+        return  # si no existe, el check de asignación ya lo bloqueará
+
+    limite = docente.horas_maximas_semana or 40  # default 40 si nulo
+
+    # Calcular duración del nuevo bloque en horas
+    def _horas(ini: time, fin: time) -> float:
+        ini_dt = dt(2000, 1, 1, ini.hour, ini.minute, ini.second)
+        fin_dt = dt(2000, 1, 1, fin.hour, fin.minute, fin.second)
+        return max((fin_dt - ini_dt).total_seconds() / 3600, 0)
+
+    nuevo_bloque_h = _horas(hora_inicio, hora_fin)
+
+    # Sumar todas las horas activas del docente en la semana
+    horarios_docente = (
+        db.query(Horario)
+        .join(Asignacion, Horario.asignacion_id == Asignacion.id)
+        .filter(
+            Asignacion.docente_id == docente_id,
+            Horario.activo == True,
+        )
+    )
+    if exclude_horario_id:
+        horarios_docente = horarios_docente.filter(Horario.id != exclude_horario_id)
+
+    horas_actuales = sum(
+        _horas(
+            h.hora_inicio if isinstance(h.hora_inicio, time) else time.fromisoformat(str(h.hora_inicio)),
+            h.hora_fin    if isinstance(h.hora_fin,    time) else time.fromisoformat(str(h.hora_fin)),
+        )
+        for h in horarios_docente.all()
+    )
+
+    total = horas_actuales + nuevo_bloque_h
+
+    if total > limite:
+        docente_nombre = "El docente"
+        if docente.user:
+            docente_nombre = f"{docente.user.nombre} {docente.user.apellido}"
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "mensaje": (
+                    f"No se puede crear el horario: {docente_nombre} alcanzaría "
+                    f"{total:.1f}h semanales, superando su límite de {limite}h."
+                ),
+                "horas_maximas": {
+                    "limite": limite,
+                    "horas_actuales": round(horas_actuales, 1),
+                    "horas_nuevas": round(nuevo_bloque_h, 1),
+                    "horas_totales": round(total, 1),
+                    "sugerencia": (
+                        f"{docente_nombre} tiene {horas_actuales:.1f}h asignadas de {limite}h permitidas. "
+                        f"El bloque solicitado agrega {nuevo_bloque_h:.1f}h más ({total:.1f}h total)."
+                    ),
+                },
+            },
+        )
+
+
 def create_horario(db: Session, horario_data: HorarioCreate, allow_conflicts: bool = True) -> Horario:
     """
     Crear un nuevo horario.
@@ -257,7 +436,24 @@ def create_horario(db: Session, horario_data: HorarioCreate, allow_conflicts: bo
             detail=f"El aula '{aula.nombre}' no está activa"
         )
     
-    # Verificar conflictos
+    # Verificar disponibilidad del docente ANTES de buscar conflictos
+    check_docente_disponibilidad(
+        db=db,
+        docente_id=asignacion.docente_id,
+        dia_semana=str(horario_data.dia_semana.value) if hasattr(horario_data.dia_semana, 'value') else str(horario_data.dia_semana),
+        hora_inicio=horario_data.hora_inicio,
+        hora_fin=horario_data.hora_fin,
+    )
+
+    # Verificar horas máximas semanales del docente
+    check_horas_maximas_docente(
+        db=db,
+        docente_id=asignacion.docente_id,
+        hora_inicio=horario_data.hora_inicio,
+        hora_fin=horario_data.hora_fin,
+    )
+
+    # Verificar conflictos de aula/docente/grupo
     conflictos = check_conflicts(
         db=db,
         asignacion_id=horario_data.asignacion_id,
@@ -344,7 +540,28 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
     hora_inicio = update_data.get('hora_inicio', horario.hora_inicio)
     hora_fin = update_data.get('hora_fin', horario.hora_fin)
     
-    # Verificar conflictos si se están cambiando datos relevantes
+    # Verificar disponibilidad del docente si cambia día u hora
+    if any(key in update_data for key in ['dia_semana', 'hora_inicio', 'hora_fin', 'asignacion_id']):
+        asig_check = db.query(Asignacion).filter(Asignacion.id == asignacion_id).first()
+        if asig_check:
+            dia_val = dia_semana.value if hasattr(dia_semana, 'value') else str(dia_semana)
+            check_docente_disponibilidad(
+                db=db,
+                docente_id=asig_check.docente_id,
+                dia_semana=dia_val,
+                hora_inicio=hora_inicio,
+                hora_fin=hora_fin,
+            )
+            # Verificar horas máximas semanales
+            check_horas_maximas_docente(
+                db=db,
+                docente_id=asig_check.docente_id,
+                hora_inicio=hora_inicio,
+                hora_fin=hora_fin,
+                exclude_horario_id=horario_id,
+            )
+
+    # Verificar conflictos de aula/docente/grupo si se están cambiando datos relevantes
     if any(key in update_data for key in ['asignacion_id', 'aula_id', 'dia_semana', 'hora_inicio', 'hora_fin']):
         conflictos = check_conflicts(
             db=db,
