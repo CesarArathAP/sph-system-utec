@@ -1,0 +1,73 @@
+# ============================================================
+# SEGURIDAD — NUNCA subir a GitHub
+# ============================================================
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# ============================================================
+# Python / FastAPI / Backend
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Base de datos SQLite local
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# ============================================================
+# Node.js / Frontend
+# ============================================================
+node_modules/
+.next/
+dist/
+.cache/
+*.tsbuildinfo
+
+# ============================================================
+# Docker
+# ============================================================
+# NO ignorar Dockerfile ni docker-compose.yml (son necesarios)
+# Sí ignorar datos persistentes locales si los hubiera
+docker-data/
+
+# ============================================================
+# IDEs y editores
+# ============================================================
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# Misceláneos
+# ============================================================
+*.bak
+*.tmp
