@@ -8,6 +8,7 @@ interface DisponibilidadModalProps {
   isOpen: boolean;
   docente: Docente | null;
   onClose: () => void;
+  onSaved?: () => void;   // callback para refrescar la lista tras guardar
 }
 
 /* ── Constantes del grid ────────────────────────────────────────────── */
@@ -31,7 +32,7 @@ for (let h = 7; h < 21; h++) {
   });
 }
 
-const BREAK_INICIO = '13:00:00';  // franja de descanso visual
+// No hay franja de descanso fija — todas las horas son seleccionables
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
 function getToken() {
@@ -48,7 +49,7 @@ function buildSelectedSet(disponibilidades: Disponibilidad[]): Set<string> {
 }
 
 /* ── Componente ─────────────────────────────────────────────────────── */
-export default function DisponibilidadModal({ isOpen, docente, onClose }: DisponibilidadModalProps) {
+export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved }: DisponibilidadModalProps) {
   // Estado local: copia mutable del grid
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -99,6 +100,7 @@ export default function DisponibilidadModal({ isOpen, docente, onClose }: Dispon
         throw new Error(err?.detail ?? `Error ${res.status}`);
       }
 
+      onSaved?.();   // refrescar la lista de docentes
       onClose();
     } catch (e: any) {
       setError(e.message ?? 'Error al guardar disponibilidad');
@@ -188,43 +190,35 @@ export default function DisponibilidadModal({ isOpen, docente, onClose }: Dispon
                   </tr>
                 </thead>
                 <tbody>
-                  {TIME_SLOTS.map((slot, i) => {
-                    const isBreak = slot.inicio === BREAK_INICIO;
-                    return (
-                      <tr
-                        key={slot.inicio}
-                        className={`border-b border-gray-100 ${isBreak ? 'bg-amber-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                          }`}
-                      >
-                        <td className={`py-3 px-4 font-medium text-xs ${isBreak ? 'text-amber-700' : 'text-gray-700'}`}>
-                          {slot.label}
-                        </td>
-                        {DAYS.map((day) => {
-                          const key = `${day.value}|${slot.inicio}`;
-                          const isSelected = selected.has(key);
-                          return (
-                            <td key={key} className="text-center py-2 px-3">
-                              {isBreak ? (
-                                <span className="text-amber-600 text-xs font-medium">Descanso</span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSlot(day.value, slot.inicio)}
-                                  className={`w-full py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${isSelected
-                                      ? 'bg-blue-500 text-white shadow-sm scale-105'
-                                      : 'bg-gray-100 text-gray-400 hover:bg-blue-100 hover:text-blue-600 border border-gray-200'
-                                    }`}
-                                  title={isSelected ? 'Disponible — clic para quitar' : 'No disponible — clic para marcar'}
-                                >
-                                  {isSelected ? '✓' : '–'}
-                                </button>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
+                  {TIME_SLOTS.map((slot, i) => (
+                    <tr
+                      key={slot.inicio}
+                      className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                    >
+                      <td className="py-3 px-4 font-medium text-xs text-gray-700">
+                        {slot.label}
+                      </td>
+                      {DAYS.map((day) => {
+                        const key = `${day.value}|${slot.inicio}`;
+                        const isSelected = selected.has(key);
+                        return (
+                          <td key={key} className="text-center py-2 px-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleSlot(day.value, slot.inicio)}
+                              className={`w-full py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${isSelected
+                                  ? 'bg-blue-500 text-white shadow-sm scale-105'
+                                  : 'bg-gray-100 text-gray-400 hover:bg-blue-100 hover:text-blue-600 border border-gray-200'
+                                }`}
+                              title={isSelected ? 'Disponible — clic para quitar' : 'No disponible — clic para marcar'}
+                            >
+                              {isSelected ? '✓' : '–'}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -238,10 +232,6 @@ export default function DisponibilidadModal({ isOpen, docente, onClose }: Dispon
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded" />
                 <span>No disponible</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-amber-100 border border-amber-200 rounded" />
-                <span>Descanso</span>
               </div>
             </div>
           </div>

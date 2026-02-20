@@ -339,6 +339,7 @@ export default function ProfesoresLayout() {
         isOpen={isDisponibilidadOpen}
         docente={selectedDocente}
         onClose={() => setIsDisponibilidadOpen(false)}
+        onSaved={fetchDocentes}
       />
     </div>
   );
