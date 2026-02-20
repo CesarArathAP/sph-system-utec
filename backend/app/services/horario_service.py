@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from fastapi import HTTPException, status
 from typing import Optional
-from datetime import time
+from datetime import time, datetime
 
 from app.models import Horario, Asignacion, Aula, Grupo, Materia, Docente, DisponibilidadDocente
+from app.models.conflicto import Conflicto
 from app.schemas.horario import HorarioCreate, HorarioUpdate, ConflictoResponse
 
 DIAS_ES = {
@@ -561,9 +562,9 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
                 exclude_horario_id=horario_id,
             )
 
-    # Verificar conflictos de aula/docente/grupo si se están cambiando datos relevantes
+    # Verificar conflictos (solo para detectar solapamientos; ya no bloquean la edición)
     if any(key in update_data for key in ['asignacion_id', 'aula_id', 'dia_semana', 'hora_inicio', 'hora_fin']):
-        conflictos = check_conflicts(
+        check_conflicts(
             db=db,
             asignacion_id=asignacion_id,
             aula_id=aula_id,
@@ -572,24 +573,35 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
             hora_fin=hora_fin,
             exclude_horario_id=horario_id
         )
-        
-        if conflictos:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "message": "Se detectaron conflictos de horario",
-                    "conflictos": [c.model_dump() for c in conflictos]
-                }
-            )
-    
+
     # Actualizar campos
     for field, value in update_data.items():
         setattr(horario, field, value)
-    
+
     db.commit()
     db.refresh(horario)
-    
+
+    # ── Marcar conflictos existentes como resueltos ──────────────────────
+    conflictos_anteriores = (
+        db.query(Conflicto)
+        .filter(
+            Conflicto.horario_id == horario_id,
+            Conflicto.resuelto == False,
+        )
+        .all()
+    )
+    if conflictos_anteriores:
+        now = datetime.utcnow()
+        for c in conflictos_anteriores:
+            c.resuelto = True
+            c.resolved_at = now
+        db.commit()
+    # ────────────────────────────────────────────────────────────────────
+
     return get_horario_by_id(db, horario_id)
+
+
+
 
 
 def delete_horario(db: Session, horario_id: int) -> Horario:
