@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { GraduationCap, Search, Pencil, Trash2, RefreshCw, Plus, CalendarDays, PowerOff, Power } from 'lucide-react';
 import ProfesoresModal from './ProfesoresModal';
 import DisponibilidadModal from './DisponibilidadModal';
+import DocenteHorarioModal from './DocenteHorarioModal';
 import { API_CONFIG } from '../../../services/config';
 
 /* ── Tipos ─────────────────────────────────────────────────────────── */
@@ -51,6 +52,7 @@ export default function ProfesoresLayout() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDisponibilidadOpen, setIsDisponibilidadOpen] = useState(false);
+  const [isHorarioOpen, setIsHorarioOpen] = useState(false);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
 
   /* ── Fetch ─────────────────────────────────────────────────────── */
@@ -250,9 +252,13 @@ export default function ProfesoresLayout() {
                     {/* Nombre completo */}
                     <td className="px-4 py-3">
                       {docente.user ? (
-                        <span className="font-medium text-gray-800">
+                        <button
+                          onClick={() => { setSelectedDocente(docente); setIsHorarioOpen(true); }}
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition"
+                          title="Ver horario del docente"
+                        >
                           {docente.user.nombre} {docente.user.apellido}
-                        </span>
+                        </button>
                       ) : (
                         <span className="text-gray-400 italic">Sin usuario vinculado</span>
                       )}
@@ -340,6 +346,13 @@ export default function ProfesoresLayout() {
         docente={selectedDocente}
         onClose={() => setIsDisponibilidadOpen(false)}
         onSaved={fetchDocentes}
+      />
+
+      {/* Modal horario del docente */}
+      <DocenteHorarioModal
+        isOpen={isHorarioOpen}
+        docente={selectedDocente}
+        onClose={() => setIsHorarioOpen(false)}
       />
     </div>
   );
