@@ -1,246 +1,389 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus } from 'lucide-react';
+import { API_CONFIG } from '../../../services/config';
 
-interface Conflicto {
+/* ── Tipos ─────────────────────────────────────────────────────────── */
+interface HorarioResponse {
   id: number;
-  horario_id: number;
-  tipo_conflicto: string;
+  asignacion_id: number;
+  aula_id: number;
+  dia_semana: string;
+  hora_inicio: string;
+  hora_fin: string;
+  tipo_sesion: string;
+  activo: boolean;
+  asignacion?: {
+    id: number;
+    ciclo_escolar: string;
+    grupo?: { nombre: string; codigo_grupo: string };
+    materia?: { nombre: string; codigo_materia: string };
+    docente?: { codigo_docente: string; user?: { nombre: string; apellido: string } };
+  };
+  aula?: { nombre: string; codigo_aula: string };
+}
+
+interface ConflictoDetectado {
+  tipo: string;
   descripcion: string;
-  resuelto: boolean;
-  created_at: string;
-  updated_at: string;
+  horario1_id?: number;
+  horario2_id?: number;
 }
 
-interface ScheduleTableProps {
-  onAssignClick: () => void;
-}
-
-// Datos de ejemplo basados en el esquema de la tabla conflictos
-const mockConflictos: Conflicto[] = [
-  {
-    id: 1,
-    horario_id: 1,
-    tipo_conflicto: 'Falta asignada',
-    descripcion: 'Materia sin asignado',
-    resuelto: false,
-    created_at: '2026-02-18T10:00:00Z',
-    updated_at: '2026-02-18T10:00:00Z',
-  },
-  {
-    id: 2,
-    horario_id: 1,
-    tipo_conflicto: 'Profesor duplicado',
-    descripcion: 'Prof. Martínez González',
-    resuelto: true,
-    created_at: '2026-02-18T10:05:00Z',
-    updated_at: '2026-02-18T10:10:00Z',
-  },
-  {
-    id: 3,
-    horario_id: 1,
-    tipo_conflicto: 'Grupo repetido',
-    descripcion: 'Grupo A1 tiene dos clases',
-    resuelto: false,
-    created_at: '2026-02-18T10:15:00Z',
-    updated_at: '2026-02-18T10:15:00Z',
-  },
+/* ── Constantes del grid ────────────────────────────────────────────── */
+const DAYS = [
+  { label: 'Lunes', value: 'lunes' },
+  { label: 'Martes', value: 'martes' },
+  { label: 'Miércoles', value: 'miercoles' },
+  { label: 'Jueves', value: 'jueves' },
+  { label: 'Viernes', value: 'viernes' },
+  { label: 'Sábado', value: 'sabado' },
 ];
 
-const tipoColor: Record<string, string> = {
-  'Falta asignada': 'bg-yellow-100 text-yellow-800',
-  'Profesor duplicado': 'bg-red-100 text-red-800',
-  'Grupo repetido': 'bg-orange-100 text-orange-800',
+const HOURS: string[] = [];
+for (let h = 7; h < 22; h++) {
+  HOURS.push(`${String(h).padStart(2, '0')}:00`);
+}
+
+const TIPO_COLORS: Record<string, string> = {
+  teorica: 'bg-blue-100 border-blue-300 text-blue-800',
+  practica: 'bg-purple-100 border-purple-300 text-purple-800',
+  laboratorio: 'bg-green-100 border-green-300 text-green-800',
 };
 
-export default function ScheduleTable({ onAssignClick }: ScheduleTableProps) {
-  const [conflictos, setConflictos] = useState<Conflicto[]>(mockConflictos);
+const TIPO_LABEL: Record<string, string> = {
+  teorica: 'Teórica', practica: 'Práctica', laboratorio: 'Lab.',
+};
 
-  const hours = [
-    '08:00 - 09:00',
-    '09:00 - 10:00',
-    '10:00 - 11:00',
-    '11:00 - 12:00',
-    '12:00 - 13:00',
-    '13:00 - 14:00',
-    '14:00 - 15:00',
-    '15:00 - 16:00',
-    '16:00 - 17:00',
-  ];
+const CONFLICTO_COLORS: Record<string, string> = {
+  aula_ocupada: 'bg-red-100 text-red-800',
+  docente_ocupado: 'bg-orange-100 text-orange-800',
+  grupo_ocupado: 'bg-yellow-100 text-yellow-800',
+  disponibilidad_docente: 'bg-purple-100 text-purple-800',
+};
 
-  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+/* ── Helpers ────────────────────────────────────────────────────────── */
+function getToken() { return localStorage.getItem('auth_token') ?? ''; }
 
-  const scheduleData = [
-    ['', '', '', '', ''],
-    ['', '', '', '', ''],
-    ['', '', '', '', ''],
-    ['', '', '', '', ''],
-    ['', '', '', '', ''],
-    ['Break', 'Break', 'Break', 'Break', 'Break'],
-    ['', '', '', '', ''],
-    ['', '', '', '', ''],
-    ['', '', '', '', ''],
-  ];
+const BASE = API_CONFIG.BASE_URL;
 
-  const toggleResuelto = (id: number) => {
-    setConflictos((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, resuelto: !c.resuelto, updated_at: new Date().toISOString() } : c
-      )
-    );
-  };
+function timeToHour(t: string): number {
+  return parseInt(t.split(':')[0], 10);
+}
 
-  const pendientes = conflictos.filter((c) => !c.resuelto).length;
+/* ── Componente principal ───────────────────────────────────────────── */
+interface ScheduleTableProps {
+  onAssignClick: () => void;
+  refreshKey?: number;   // incrementar para forzar recarga
+}
 
+export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: ScheduleTableProps) {
+  const [horarios, setHorarios] = useState<HorarioResponse[]>([]);
+  const [conflictos, setConflictos] = useState<ConflictoDetectado[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingConf, setLoadingConf] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filterDia, setFilterDia] = useState<string>('');
+  const [cicloInput, setCicloInput] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  /* ── Fetch horarios ───────────────────────────────────────────────── */
+  const fetchHorarios = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const params = new URLSearchParams({ page: '1', page_size: '100' });
+      if (filterDia) params.set('dia_semana', filterDia);
+      const res = await fetch(`${BASE}/horarios?${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setHorarios(data.horarios ?? []);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterDia, refreshKey]);
+
+  /* ── Fetch conflictos ─────────────────────────────────────────────── */
+  const fetchConflictos = useCallback(async () => {
+    setLoadingConf(true);
+    try {
+      const params = cicloInput ? `?ciclo_escolar=${encodeURIComponent(cicloInput)}` : '';
+      const res = await fetch(`${BASE}/horarios/conflicts${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error();
+      setConflictos(await res.json());
+    } catch {
+      setConflictos([]);
+    } finally {
+      setLoadingConf(false);
+    }
+  }, [cicloInput]);
+
+  useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
+  useEffect(() => { fetchConflictos(); }, [fetchConflictos]);
+
+  /* ── Construir mapa del grid: dia → hora → horarios ──────────────── */
+  const gridMap = new Map<string, Map<number, HorarioResponse[]>>();
+  DAYS.forEach(({ value }) => gridMap.set(value, new Map()));
+
+  horarios.filter((h) => h.activo).forEach((h) => {
+    const dayMap = gridMap.get(h.dia_semana);
+    if (!dayMap) return;
+    const startH = timeToHour(h.hora_inicio);
+    const endH = timeToHour(h.hora_fin);
+    for (let hh = startH; hh < endH; hh++) {
+      const key = hh;
+      if (!dayMap.has(key)) dayMap.set(key, []);
+      dayMap.get(key)!.push(h);
+    }
+  });
+
+  /* ── Vista lista (tabla simple) ───────────────────────────────────── */
+  const renderList = () => (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="text-left px-4 py-3 font-semibold text-gray-600">Día</th>
+            <th className="text-left px-4 py-3 font-semibold text-gray-600">Hora</th>
+            <th className="text-left px-4 py-3 font-semibold text-gray-600">Materia</th>
+            <th className="text-left px-4 py-3 font-semibold text-gray-600">Grupo</th>
+            <th className="text-left px-4 py-3 font-semibold text-gray-600">Docente</th>
+            <th className="text-left px-4 py-3 font-semibold text-gray-600">Aula</th>
+            <th className="text-center px-4 py-3 font-semibold text-gray-600">Tipo</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {horarios.length === 0 ? (
+            <tr>
+              <td colSpan={7} className="text-center py-12 text-gray-400">No hay horarios registrados</td>
+            </tr>
+          ) : (
+            [...horarios].sort((a, b) => {
+              const di = DAYS.findIndex(d => d.value === a.dia_semana) - DAYS.findIndex(d => d.value === b.dia_semana);
+              return di !== 0 ? di : a.hora_inicio.localeCompare(b.hora_inicio);
+            }).map((h) => (
+              <tr key={h.id} className={`hover:bg-gray-50 transition ${!h.activo ? 'opacity-40' : ''}`}>
+                <td className="px-4 py-3 capitalize text-gray-700">{h.dia_semana}</td>
+                <td className="px-4 py-3 text-gray-600 font-mono text-xs">
+                  {h.hora_inicio.slice(0, 5)} – {h.hora_fin.slice(0, 5)}
+                </td>
+                <td className="px-4 py-3 font-medium text-gray-800">
+                  {h.asignacion?.materia?.nombre ?? <span className="text-gray-400">—</span>}
+                  {h.asignacion?.materia?.codigo_materia && (
+                    <span className="ml-1 text-xs text-gray-400">({h.asignacion.materia.codigo_materia})</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-gray-700">{h.asignacion?.grupo?.nombre ?? '—'}</td>
+                <td className="px-4 py-3 text-gray-700 text-sm">
+                  {h.asignacion?.docente?.user
+                    ? `${h.asignacion.docente.user.nombre} ${h.asignacion.docente.user.apellido}`
+                    : h.asignacion?.docente?.codigo_docente ?? '—'}
+                </td>
+                <td className="px-4 py-3 text-gray-600 text-xs">{h.aula?.nombre ?? '—'}</td>
+                <td className="px-4 py-3 text-center">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                    {TIPO_LABEL[h.tipo_sesion] ?? h.tipo_sesion}
+                  </span>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  /* ── Vista grid ───────────────────────────────────────────────────── */
+  const renderGrid = () => (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm overflow-x-auto">
+      <table className="text-xs border-collapse min-w-[700px]">
+        <thead>
+          <tr className="bg-gray-50 border-b-2 border-gray-200">
+            <th className="px-3 py-3 text-left font-semibold text-gray-600 w-20 sticky left-0 bg-gray-50 z-10">Hora</th>
+            {DAYS.map(({ label, value }) =>
+              (!filterDia || filterDia === value) ? (
+                <th key={value} className="px-2 py-3 text-center font-semibold text-gray-600 min-w-[130px]">
+                  {label}
+                </th>
+              ) : null
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {HOURS.map((hourStr, i) => {
+            const hourInt = parseInt(hourStr, 10);
+            return (
+              <tr key={hourStr} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                <td className="px-3 py-2 font-mono text-gray-500 text-[11px] border-r border-gray-200 sticky left-0 bg-inherit z-10 whitespace-nowrap">
+                  {hourStr}
+                </td>
+                {DAYS.map(({ value }) => {
+                  if (filterDia && filterDia !== value) return null;
+                  const cellItems = gridMap.get(value)?.get(hourInt) ?? [];
+                  return (
+                    <td key={value} className="px-1 py-1 border-r border-gray-100 align-top min-h-[36px]">
+                      {cellItems.map((h, idx) => (
+                        <div
+                          key={`${h.id}-${idx}`}
+                          className={`rounded border px-1.5 py-1 mb-0.5 leading-tight cursor-default ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 border-gray-200 text-gray-700'}`}
+                          title={`${h.asignacion?.materia?.nombre ?? ''} · ${h.asignacion?.grupo?.nombre ?? ''} · ${h.aula?.nombre ?? ''}`}
+                        >
+                          <div className="font-semibold truncate max-w-[120px]">
+                            {h.asignacion?.materia?.nombre ?? 'Sin materia'}
+                          </div>
+                          <div className="text-[10px] opacity-75 truncate max-w-[120px]">
+                            {h.asignacion?.grupo?.codigo_grupo} · {h.aula?.codigo_aula ?? '—'}
+                          </div>
+                          {h.asignacion?.docente?.user && (
+                            <div className="text-[10px] opacity-60 truncate max-w-[120px]">
+                              {h.asignacion.docente.user.nombre} {h.asignacion.docente.user.apellido.charAt(0)}.
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  /* ── UI ─────────────────────────────────────────────────────────── */
   return (
     <div className="p-6 h-full overflow-auto">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Horario</h2>
-        <button
-          onClick={onAssignClick}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
-        >
-          Asignar
-        </button>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <Calendar className="text-blue-600" size={26} />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Horarios</h1>
+            <p className="text-gray-500 text-sm">{horarios.length} sesiones registradas</p>
+          </div>
+        </div>
+        <div className="flex gap-2 items-center">
+          <button onClick={fetchHorarios}
+            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition" title="Actualizar">
+            <RefreshCw size={15} className={loading ? 'animate-spin text-blue-500' : 'text-gray-500'} />
+          </button>
+          <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition text-gray-600 font-medium">
+            {viewMode === 'grid' ? '☰ Lista' : '⊞ Cuadrícula'}
+          </button>
+          <button onClick={onAssignClick}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-sm">
+            <Plus size={15} /> Nuevo horario
+          </button>
+        </div>
       </div>
 
-      {/* Contenedor principal: tabla de horario + tabla de conflictos */}
-      <div className="flex gap-4 items-start">
-        {/* Tabla de horarios */}
-        <div className="flex-1 bg-white rounded-lg shadow overflow-x-auto min-w-0">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100 border-b-2 border-gray-300">
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 w-28 text-sm">
-                  Hora
-                </th>
-                {days.map((day) => (
-                  <th
-                    key={day}
-                    className="px-4 py-3 text-center font-semibold text-gray-700 min-w-[100px] text-sm"
-                  >
-                    {day}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {hours.map((hour, index) => (
-                <tr key={hour} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="px-3 py-3 text-xs font-medium text-gray-600 border-r border-gray-200 whitespace-nowrap">
-                    {hour}
-                  </td>
-                  {scheduleData[index].map((cell, dayIndex) => (
-                    <td
-                      key={`${hour}-${dayIndex}`}
-                      className="px-2 py-4 text-center border-r border-gray-200 text-sm"
-                    >
-                      {cell && (
-                        <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium text-xs">
-                          {cell}
-                        </div>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Filtros */}
+      <div className="flex gap-3 mb-5 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-gray-400" />
+          <select
+            value={filterDia}
+            onChange={(e) => setFilterDia(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Todos los días</option>
+            {DAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
         </div>
+        <input
+          type="text"
+          value={cicloInput}
+          onChange={(e) => setCicloInput(e.target.value)}
+          placeholder="Ciclo escolar (p.ej. 2026-1)"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+        />
+      </div>
 
-        {/* Tabla de conflictos detectados */}
-        <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow overflow-hidden">
-          {/* Encabezado de la tabla de conflictos */}
-          <div className="bg-blue-600 px-4 py-3 flex items-center justify-between">
-            <h3 className="text-white font-semibold text-sm">Conflictos detectados</h3>
-            {pendientes > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                {pendientes}
-              </span>
-            )}
+      {/* Error */}
+      {error && !loading && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">{error}</div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex justify-center py-16">
+          <RefreshCw size={24} className="animate-spin text-blue-500" />
+        </div>
+      )}
+
+      {!loading && !error && (
+        <div className="flex gap-4 items-start">
+          {/* ── Tabla principal ── */}
+          <div className="flex-1 min-w-0">
+            {viewMode === 'grid' ? renderGrid() : renderList()}
           </div>
 
-          {/* Cabecera de columnas */}
-          <div className="grid grid-cols-[1fr_1.6fr_0.8fr_0.6fr] bg-gray-100 border-b border-gray-200 px-3 py-2">
-            <span className="text-xs font-semibold text-gray-600">Tipo</span>
-            <span className="text-xs font-semibold text-gray-600">Descripción</span>
-            <span className="text-xs font-semibold text-gray-600">Estado</span>
-            <span className="text-xs font-semibold text-gray-600">Acción</span>
-          </div>
-
-          {/* Filas de conflictos */}
-          <div className="divide-y divide-gray-100">
-            {conflictos.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">
-                Sin conflictos detectados
+          {/* ── Panel de conflictos ── */}
+          <div className="w-80 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-red-600 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white font-semibold text-sm">
+                <AlertTriangle size={15} />
+                Conflictos detectados
               </div>
-            ) : (
-              conflictos.map((conflicto) => (
-                <div
-                  key={conflicto.id}
-                  className={`grid grid-cols-[1fr_1.6fr_0.8fr_0.6fr] items-center px-3 py-2.5 gap-1 transition-colors ${
-                    conflicto.resuelto ? 'bg-green-50' : 'bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  {/* Tipo */}
-                  <div>
-                    <span
-                      className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-tight ${
-                        tipoColor[conflicto.tipo_conflicto] ?? 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {conflicto.tipo_conflicto}
-                    </span>
-                  </div>
-
-                  {/* Descripción */}
-                  <div className="text-xs text-gray-700 leading-tight truncate" title={conflicto.descripcion}>
-                    {conflicto.descripcion}
-                  </div>
-
-                  {/* Estado */}
-                  <div>
-                    <span
-                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                        conflicto.resuelto
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}
-                    >
-                      {conflicto.resuelto ? 'Resuelto' : 'Pendiente'}
-                    </span>
-                  </div>
-
-                  {/* Acción: toggle resuelto */}
-                  <div className="flex justify-center">
-                    <button
-                      onClick={() => toggleResuelto(conflicto.id)}
-                      title={conflicto.resuelto ? 'Marcar como pendiente' : 'Marcar como resuelto'}
-                      className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none ${
-                        conflicto.resuelto ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-                          conflicto.resuelto ? 'translate-x-4' : 'translate-x-0.5'
-                        }`}
-                      />
+              <div className="flex items-center gap-2">
+                {loadingConf
+                  ? <RefreshCw size={13} className="animate-spin text-red-200" />
+                  : (
+                    <button onClick={fetchConflictos} title="Refrescar conflictos"
+                      className="text-red-200 hover:text-white transition">
+                      <RefreshCw size={13} />
                     </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                  )
+                }
+                {conflictos.length > 0 && (
+                  <span className="bg-white text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {conflictos.length}
+                  </span>
+                )}
+              </div>
+            </div>
 
-          {/* Footer con resumen */}
-          <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 flex justify-between text-xs text-gray-500">
-            <span>Total: {conflictos.length}</span>
-            <span className="text-red-500 font-medium">Pendientes: {pendientes}</span>
-            <span className="text-green-600 font-medium">
-              Resueltos: {conflictos.length - pendientes}
-            </span>
+            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
+              {conflictos.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-sm text-gray-400">
+                  <CheckCircle size={28} className="text-green-400" />
+                  Sin conflictos detectados
+                </div>
+              ) : (
+                conflictos.map((c, i) => (
+                  <div key={i} className="px-3 py-3">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${CONFLICTO_COLORS[c.tipo] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {c.tipo.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-700 leading-tight">{c.descripcion}</p>
+                    {(c.horario1_id || c.horario2_id) && (
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Horarios #{c.horario1_id} {c.horario2_id ? `y #${c.horario2_id}` : ''}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 text-xs text-gray-500 flex justify-between">
+              <span>Total: {conflictos.length}</span>
+              <span className={conflictos.length > 0 ? 'text-red-500 font-medium' : 'text-green-600'}>
+                {conflictos.length > 0 ? `⚠ ${conflictos.length} pendiente(s)` : '✓ Todo OK'}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

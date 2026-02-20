@@ -14,6 +14,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
@@ -32,15 +33,24 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
       {/* Main Content */}
       <main className="ml-64 flex-1 overflow-auto">
         {section === 'inicio' && <HomeDashboard />}
-        {section === 'horarios' && <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />}
+        {section === 'horarios' && (
+          <ScheduleTable
+            onAssignClick={() => setIsModalOpen(true)}
+            refreshKey={refreshKey}
+          />
+        )}
         {section === 'docentes' && <ProfesoresLayout />}
         {section === 'aulas' && <AulasLayout />}
         {section === 'materias' && <MateriasLayout />}
         {section === 'grupos' && <GruposLayout />}
       </main>
 
-      {/* Modal de asignación */}
-      <AssignmentModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      {/* Modal de nuevo horario */}
+      <AssignmentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSaved={() => { setRefreshKey((k) => k + 1); setIsModalOpen(false); }}
+      />
     </div>
   );
 }
