@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Home, Calendar, GraduationCap, BookOpen, Building2, Users, LogOut,
+  Home, Calendar, GraduationCap, BookOpen, Building2, Users, LogOut, BookCopy,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,6 +23,7 @@ const menuItems = [
   { id: 'materias', label: 'Materias', Icon: BookOpen, href: '/auth/dashboard/materias' },
   { id: 'aulas', label: 'Aulas', Icon: Building2, href: '/auth/dashboard/aulas' },
   { id: 'grupos', label: 'Grupos', Icon: Users, href: '/auth/dashboard/grupos' },
+  { id: 'asignaciones', label: 'Asignaciones', Icon: BookCopy, href: '/auth/dashboard/asignaciones' },
 ];
 
 const rolLabel: Record<string, string> = {

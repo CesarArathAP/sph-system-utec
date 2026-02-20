@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from '../layout/Sidebar';
 import HomeDashboard from '../layout/HomeDashboard';
 import { ScheduleTable } from '../modules/horarios';
-import { AssignmentModal } from '../modules/asignaciones';
+import { AssignmentModal, AsignacionesLayout } from '../modules/asignaciones';
 import { ProfesoresLayout } from '../modules/profesores';
 import { AulasLayout } from '../modules/aulas';
 import { MateriasLayout } from '../modules/materias';
@@ -43,6 +43,7 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
         {section === 'aulas' && <AulasLayout />}
         {section === 'materias' && <MateriasLayout />}
         {section === 'grupos' && <GruposLayout />}
+        {section === 'asignaciones' && <AsignacionesLayout />}
       </main>
 
       {/* Modal de nuevo horario */}
