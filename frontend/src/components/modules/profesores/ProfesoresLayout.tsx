@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { GraduationCap, Search, Pencil, Trash2, RefreshCw, Plus, CalendarDays } from 'lucide-react';
+import { GraduationCap, Search, Pencil, Trash2, RefreshCw, Plus, CalendarDays, PowerOff, Power } from 'lucide-react';
 import ProfesoresModal from './ProfesoresModal';
 import DisponibilidadModal from './DisponibilidadModal';
 import { API_CONFIG } from '../../../services/config';
@@ -14,9 +14,18 @@ export interface Disponibilidad {
   created_at: string;
 }
 
+export interface UserInfo {
+  id: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  activo: boolean;
+}
+
 export interface Docente {
   id?: number;
   user_id: number;
+  user?: UserInfo;              // datos del user vinculado (Opción A)
   codigo_docente: string;
   departamento: string | null;
   horas_maximas_semana: number;
@@ -35,12 +44,12 @@ const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
 
 /* ── Componente principal ───────────────────────────────────────────── */
 export default function ProfesoresLayout() {
-  const [docentes, setDocentes]               = useState<Docente[]>([]);
-  const [total, setTotal]                     = useState(0);
-  const [loading, setLoading]                 = useState(true);
-  const [error, setError]                     = useState<string | null>(null);
-  const [searchTerm, setSearchTerm]           = useState('');
-  const [isModalOpen, setIsModalOpen]         = useState(false);
+  const [docentes, setDocentes] = useState<Docente[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDisponibilidadOpen, setIsDisponibilidadOpen] = useState(false);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
 
@@ -69,24 +78,23 @@ export default function ProfesoresLayout() {
   const handleSave = async (docente: Docente) => {
     try {
       const isEditing = !!selectedDocente?.id;
-      const method    = isEditing ? 'PUT' : 'POST';
-      const url       = isEditing ? `${BASE}/${selectedDocente!.id}` : BASE;
+      const method = isEditing ? 'PUT' : 'POST';
+      const url = isEditing ? `${BASE}/${selectedDocente!.id}` : BASE;
 
-      // Para PUT solo enviamos los campos de DocenteUpdate
       const body = isEditing
         ? {
-            codigo_docente:      docente.codigo_docente,
-            departamento:        docente.departamento,
-            horas_maximas_semana: docente.horas_maximas_semana,
-            activo:              docente.activo,
-          }
+          codigo_docente: docente.codigo_docente,
+          departamento: docente.departamento,
+          horas_maximas_semana: docente.horas_maximas_semana,
+          activo: docente.activo,
+        }
         : {
-            user_id:             docente.user_id,
-            codigo_docente:      docente.codigo_docente,
-            departamento:        docente.departamento,
-            horas_maximas_semana: docente.horas_maximas_semana,
-            disponibilidades:    [],
-          };
+          user_id: docente.user_id,
+          codigo_docente: docente.codigo_docente,
+          departamento: docente.departamento,
+          horas_maximas_semana: docente.horas_maximas_semana,
+          disponibilidades: [],
+        };
 
       const res = await fetch(url, {
         method,
@@ -108,6 +116,25 @@ export default function ProfesoresLayout() {
     }
   };
 
+  /* ── Toggle activo ─────────────────────────────────────────────── */
+  const handleToggleActivo = async (docente: Docente) => {
+    if (!docente.id) return;
+    try {
+      const res = await fetch(`${BASE}/${docente.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ activo: !docente.activo }),
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      await fetchDocentes();
+    } catch (e: any) {
+      alert(`No se pudo cambiar el estado: ${e.message}`);
+    }
+  };
+
   /* ── Eliminar ──────────────────────────────────────────────────── */
   const handleDelete = async (id: number | undefined) => {
     if (!id || !confirm('¿Eliminar este docente? Esta acción no se puede deshacer.')) return;
@@ -124,11 +151,16 @@ export default function ProfesoresLayout() {
   };
 
   /* ── Filtro local ──────────────────────────────────────────────── */
-  const filtered = docentes.filter(
-    (d) =>
-      d.codigo_docente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (d.departamento ?? '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = docentes.filter((d) => {
+    const term = searchTerm.toLowerCase();
+    const nombre = `${d.user?.nombre ?? ''} ${d.user?.apellido ?? ''}`.toLowerCase();
+    return (
+      d.codigo_docente.toLowerCase().includes(term) ||
+      (d.departamento ?? '').toLowerCase().includes(term) ||
+      nombre.includes(term) ||
+      (d.user?.email ?? '').toLowerCase().includes(term)
+    );
+  });
 
   /* ── UI ────────────────────────────────────────────────────────── */
   return (
@@ -165,7 +197,7 @@ export default function ProfesoresLayout() {
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="Buscar por código o departamento..."
+          placeholder="Buscar por nombre, código, departamento o email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -191,9 +223,11 @@ export default function ProfesoresLayout() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Código</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Nombre</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Departamento</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Hrs máx/semana</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Disponibilidades</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-600">Hrs/semana</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-600">Disponibilidad</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
               </tr>
@@ -201,7 +235,7 @@ export default function ProfesoresLayout() {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400">
+                  <td colSpan={8} className="text-center py-12 text-gray-400">
                     {searchTerm ? 'Sin resultados para la búsqueda' : 'No hay docentes registrados'}
                   </td>
                 </tr>
@@ -211,6 +245,22 @@ export default function ProfesoresLayout() {
                     {/* Código */}
                     <td className="px-4 py-3 font-mono font-semibold text-gray-800">
                       {docente.codigo_docente}
+                    </td>
+
+                    {/* Nombre completo */}
+                    <td className="px-4 py-3">
+                      {docente.user ? (
+                        <span className="font-medium text-gray-800">
+                          {docente.user.nombre} {docente.user.apellido}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">Sin usuario vinculado</span>
+                      )}
+                    </td>
+
+                    {/* Email */}
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {docente.user?.email ?? <span className="text-gray-400">—</span>}
                     </td>
 
                     {/* Departamento */}
@@ -251,6 +301,13 @@ export default function ProfesoresLayout() {
                           title="Editar docente"
                         >
                           <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleToggleActivo(docente)}
+                          className={`p-1.5 rounded-lg transition ${docente.activo ? 'hover:bg-orange-50 text-orange-500' : 'hover:bg-green-50 text-green-600'}`}
+                          title={docente.activo ? 'Suspender' : 'Activar'}
+                        >
+                          {docente.activo ? <PowerOff size={14} /> : <Power size={14} />}
                         </button>
                         <button
                           onClick={() => handleDelete(docente.id)}

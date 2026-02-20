@@ -31,6 +31,19 @@ class DisponibilidadResponse(DisponibilidadBase):
         from_attributes = True
 
 
+# ── Info del usuario vinculado al docente ───────────────────────────────
+class UserInfo(BaseModel):
+    """Información básica del usuario asociado al docente."""
+    id: int
+    nombre: str
+    apellido: str
+    email: str
+    activo: bool
+
+    class Config:
+        from_attributes = True
+
+
 # Schemas para Docente
 class DocenteBase(BaseModel):
     """Schema base de docente."""
@@ -54,9 +67,10 @@ class DocenteUpdate(BaseModel):
 
 
 class DocenteResponse(DocenteBase):
-    """Schema para respuesta de docente."""
+    """Schema para respuesta de docente — incluye datos del usuario vinculado."""
     id: int
     user_id: int
+    user: Optional[UserInfo] = None      # datos del user (nombre, apellido, email)
     activo: bool
     created_at: datetime
     updated_at: datetime
