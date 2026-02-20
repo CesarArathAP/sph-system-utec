@@ -33,7 +33,7 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
       <main className="ml-64 flex-1 overflow-auto">
         {section === 'inicio' && <HomeDashboard />}
         {section === 'horarios' && <ScheduleTable onAssignClick={() => setIsModalOpen(true)} />}
-        {section === 'profesores' && <ProfesoresLayout />}
+        {section === 'docentes' && <ProfesoresLayout />}
         {section === 'aulas' && <AulasLayout />}
         {section === 'materias' && <MateriasLayout />}
         {section === 'grupos' && <GruposLayout />}
