@@ -489,7 +489,9 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       <HorarioDetailModal
         horarioId={detailId}
         onClose={() => setDetailId(null)}
+        onSaved={() => { setDetailId(null); fetchHorarios(); }}
       />
+
     </div>
   );
 }
