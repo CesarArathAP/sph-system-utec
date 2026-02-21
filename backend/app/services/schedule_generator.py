@@ -1,487 +1,491 @@
 """
-Servicio de generación automática de horarios.
+Generador automático de horarios — SPH System UTEC.
+
+Dado un ciclo escolar, recorre todas las Asignaciones (docente ↔ materia ↔ grupo)
+y crea las Horarios correspondientes de forma automática, respetando:
+
+  1. Disponibilidad declarada del docente (tabla DisponibilidadDocente).
+     • Si el docente NO tiene ningún registro ➜ se asume disponible siempre.
+     • Si tiene registros ➜ el slot debe quedar cubierto por al menos uno.
+
+  2. Horas máximas semanales (Docente.horas_maximas_semana).
+     El conteo es incremental: se actualiza después de cada sesión creada
+     para que la siguiente sesión del mismo docente lo tome en cuenta.
+
+  3. Aula disponible: sin solapamiento con otros Horarios activos
+     en el mismo día/hora.
+
+  4. Sin colisión de docente: sin solapamiento con otros Horarios activos
+     del mismo docente en el mismo día/hora.
+
+  5. Sin colisión de grupo: sin solapamiento con otros Horarios activos
+     del mismo grupo en el mismo día/hora.
+
+IMPORTANTE: los horarios se insertan directamente (db.add / db.commit) sin
+pasar por horario_service.create_horario, porque ese método llama a
+check_docente_disponibilidad y check_horas_maximas_docente que lanzan
+HTTPException. Esas excepciones serían absorbidas silenciosamente por el
+bloque except/continue del generador, produciendo 0 horarios creados.
 """
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from datetime import time
 from typing import Optional
-from datetime import time, datetime
 
-from app.models import Asignacion, Horario, Aula, Materia, Grupo, Docente
-from app.services import horario_service
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, or_
+from fastapi import HTTPException, status
+
+from app.models import (
+    Asignacion, Horario, Aula, Docente,
+    DisponibilidadDocente,
+)
 
 
-# Configuración de slots de tiempo disponibles
+# ─── Slots de tiempo disponibles ─────────────────────────────────────────────
+
 TIME_SLOTS = [
-    (time(7, 0), time(9, 0)),   # 7:00-9:00
-    (time(9, 0), time(11, 0)),  # 9:00-11:00
-    (time(11, 0), time(13, 0)), # 11:00-13:00
-    (time(13, 0), time(15, 0)), # 13:00-15:00
-    (time(15, 0), time(17, 0)), # 15:00-17:00
-    (time(17, 0), time(19, 0)), # 17:00-19:00
-    (time(19, 0), time(21, 0)), # 19:00-21:00
+    (time(7,  0), time(9,  0)),
+    (time(9,  0), time(11, 0)),
+    (time(11, 0), time(13, 0)),
+    (time(13, 0), time(15, 0)),
+    (time(15, 0), time(17, 0)),
+    (time(17, 0), time(19, 0)),
+    (time(19, 0), time(21, 0)),
 ]
 
 DAYS_OF_WEEK = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
 
 
-def generate_schedule(db: Session, ciclo_escolar: str, clear_existing: bool = False) -> dict:
+# ─── Helpers internos ─────────────────────────────────────────────────────────
+
+def _horas(ini: time, fin: time) -> float:
+    """Duración en horas decimales entre dos objetos time."""
+    return (fin.hour * 60 + fin.minute - ini.hour * 60 - ini.minute) / 60
+
+
+def _to_time(v) -> time:
+    """Normalizar a time (la BD a veces devuelve string en SQLite)."""
+    return v if isinstance(v, time) else time.fromisoformat(str(v))
+
+
+def _docente_horas_usadas(db: Session, docente_id: int) -> float:
     """
-    Generar horarios automáticamente para un ciclo escolar.
-    
-    Args:
-        db: Sesión de base de datos
-        ciclo_escolar: Ciclo escolar para generar horarios
-        clear_existing: Si True, elimina horarios existentes del ciclo
-        
-    Returns:
-        Diccionario con resumen de generación
+    Suma de horas de todos los Horarios ACTIVOS del docente.
+    Se llama al inicio de cada asignación para obtener la base incremental.
     """
-    # Limpiar horarios existentes si se solicita
-    if clear_existing:
-        _clear_schedule(db, ciclo_escolar)
-    
-    # Obtener todas las asignaciones del ciclo
-    asignaciones = db.query(Asignacion).filter(
-        Asignacion.ciclo_escolar == ciclo_escolar
-    ).all()
-    
-    if not asignaciones:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontraron asignaciones para el ciclo {ciclo_escolar}"
+    filas = (
+        db.query(Horario)
+        .join(Asignacion)
+        .filter(Asignacion.docente_id == docente_id, Horario.activo == True)
+        .all()
+    )
+    return sum(_horas(_to_time(h.hora_inicio), _to_time(h.hora_fin)) for h in filas)
+
+
+# ── Réplica directa de check_docente_disponibilidad (sin HTTPException) ──────
+
+def _docente_disponible(db: Session, docente_id: int,
+                        dia: str, ini: time, fin: time) -> bool:
+    """
+    True si el slot [dia, ini, fin] está cubierto por la disponibilidad del docente.
+
+    Lógica idéntica a horario_service.check_docente_disponibilidad, pero devuelve
+    bool en lugar de lanzar HTTPException (para poder usarla en bucles).
+    """
+    slots = (
+        db.query(DisponibilidadDocente)
+        .filter(
+            DisponibilidadDocente.docente_id == docente_id,
+            DisponibilidadDocente.dia_semana == dia,
         )
-    
-    # Estadísticas
-    stats = {
-        "total_asignaciones": len(asignaciones),
-        "horarios_creados": 0,
-        "conflictos_detectados": 0,
-        "asignaciones_fallidas": [],
-        "detalles": []
-    }
-    
-    # Generar horarios para cada asignación
-    for asignacion in asignaciones:
-        try:
-            result = _generate_for_asignacion(db, asignacion)
-            stats["horarios_creados"] += result["horarios_creados"]
-            stats["conflictos_detectados"] += result["conflictos"]
-            stats["detalles"].append({
-                "asignacion_id": asignacion.id,
-                "grupo": asignacion.grupo.nombre,
-                "materia": asignacion.materia.nombre,
-                "docente": f"{asignacion.docente.user.nombre} {asignacion.docente.user.apellido}",
-                "horarios_creados": result["horarios_creados"],
-                "conflictos": result["conflictos"]
-            })
-        except Exception as e:
-            stats["asignaciones_fallidas"].append({
-                "asignacion_id": asignacion.id,
-                "error": str(e)
-            })
-    
-    return stats
+        .order_by(DisponibilidadDocente.hora_inicio)
+        .all()
+    )
+
+    # Sin registros → disponible siempre (misma regla que el service)
+    if not slots:
+        return True
+
+    # El bloque debe quedar completamente cubierto por la unión continua de slots
+    cursor = None
+    for s in slots:
+        s_ini = _to_time(s.hora_inicio)
+        s_fin = _to_time(s.hora_fin)
+        if s_ini <= ini:
+            cursor = s_fin if cursor is None else max(cursor, s_fin)
+        elif cursor is not None and s_ini <= cursor:
+            cursor = max(cursor, s_fin)
+
+    return cursor is not None and cursor >= fin
 
 
-def _generate_for_asignacion(db: Session, asignacion: Asignacion) -> dict:
+# ── Réplica directa de check_conflicts (sin HTTPException) ───────────────────
+
+def _hay_solapamiento(db: Session, dia: str, ini: time, fin: time,
+                      aula_id: int, docente_id: int, grupo_id: int) -> bool:
     """
-    Generar horarios para una asignación específica con distribución optimizada.
-    
-    Args:
-        db: Sesión de base de datos
-        asignacion: Asignación para la cual generar horarios
-        
-    Returns:
-        Diccionario con estadísticas de generación
-    """
-    materia = asignacion.materia
-    grupo = asignacion.grupo
-    
-    # Calcular número de sesiones necesarias (asumiendo sesiones de 2 horas)
-    horas_necesarias = materia.horas_semana
-    num_sesiones = (horas_necesarias + 1) // 2  # Redondear hacia arriba
-    
-    horarios_creados = 0
-    conflictos = 0
-    
-    # Obtener carga actual por día para balanceo
-    day_load = _get_day_load(db, asignacion.docente_id, asignacion.grupo_id)
-    
-    # Generar lista de slots disponibles con prioridad
-    available_slots = _get_prioritized_slots(db, asignacion, day_load, num_sesiones)
-    
-    # Validar horas máximas del docente antes de empezar
-    if not _check_teacher_max_hours(db, asignacion.docente_id, asignacion.ciclo_escolar, horas_necesarias):
-         # Registrar error o advertencia, pero tal vez intentar asignar parcial?
-         # Por ahora, si no cabe completo, no asignamos nada o lanzamos excepción
-         return {
-             "horarios_creados": 0,
-             "conflictos": 0,
-             "error": "Excede horas máximas del docente"
-         }
+    True si alguna de las tres condiciones de conflicto se cumple:
+      • El aula ya está ocupada en ese slot.
+      • El docente ya tiene clase en ese slot.
+      • El grupo ya tiene clase en ese slot.
 
-    # Intentar asignar sesiones usando slots priorizados
-    for i in range(num_sesiones):
-        # Determinar tipo de sesión
-        if materia.requiere_laboratorio and i == 0:
-            tipo_sesion = "laboratorio"
-            tipo_aula_req = "laboratorio"
-        elif i % 2 == 0:
-            tipo_sesion = "teorica"
-            tipo_aula_req = materia.tipo_aula_requerida or "aula"
-        else:
-            tipo_sesion = "practica"
-            tipo_aula_req = materia.tipo_aula_requerida or "aula"
-        
-        # Buscar slot disponible de la lista priorizada
-        slot_found = False
-        for day, hora_inicio, hora_fin, priority in available_slots:
-            # Verificar disponibilidad del docente
-            if not _check_teacher_availability(db, asignacion.docente_id, day, hora_inicio, hora_fin):
-                continue
-            
-            # Verificar horas máximas nuevamente (acumulativo)
-            # (Ya validamos globalmente, pero para ser precisos podríamos hacerlo aquí si asignamos parcial)
-            
-            # Buscar aula disponible
-            aula = _find_available_classroom(
-                db, day, hora_inicio, hora_fin,
-                tipo_aula_req, grupo.num_estudiantes,
-                asignacion.id
-            )
-            
-            if aula:
-                # Crear horario
-                try:
-                    horario = horario_service.create_horario(
-                        db,
-                        horario_service.HorarioCreate(
-                            asignacion_id=asignacion.id,
-                            aula_id=aula.id,
-                            dia_semana=day,
-                            hora_inicio=hora_inicio,
-                            hora_fin=hora_fin,
-                            tipo_sesion=tipo_sesion
-                        ),
-                        allow_conflicts=True  # Permitir conflictos y registrarlos
-                    )
-                    horarios_creados += 1
-                    
-                    # Verificar si se registraron conflictos
-                    from app.models import Conflicto
-                    conflictos_horario = db.query(Conflicto).filter(
-                        Conflicto.horario_id == horario.id,
-                        Conflicto.resuelto == False
-                    ).count()
-                    conflictos += conflictos_horario
-                    
-                    # Actualizar carga del día
-                    day_load[day] = day_load.get(day, 0) + 1
-                    
-                    # Remover slot usado de la lista
-                    available_slots.remove((day, hora_inicio, hora_fin, priority))
-                    
-                    slot_found = True
-                    break
-                except Exception as e:
-                    # Si falla, continuar buscando
-                    continue
-        
-        if not slot_found:
-            # No se pudo asignar esta sesión
-            break
-    
-    return {
-        "horarios_creados": horarios_creados,
-        "conflictos": conflictos
-    }
+    Implementa la misma lógica de solapamiento temporal que
+    horario_service.check_conflicts.
+    """
+    overlap_filter = and_(
+        Horario.dia_semana == dia,
+        Horario.activo == True,
+        or_(
+            and_(Horario.hora_inicio <= ini, Horario.hora_fin > ini),
+            and_(Horario.hora_inicio < fin,  Horario.hora_fin >= fin),
+            and_(Horario.hora_inicio >= ini, Horario.hora_fin <= fin),
+        ),
+    )
+
+    # 1. Aula ocupada
+    if db.query(Horario).filter(overlap_filter, Horario.aula_id == aula_id).first():
+        return True
+
+    # 2. Docente ocupado
+    if (
+        db.query(Horario)
+        .join(Asignacion)
+        .filter(overlap_filter, Asignacion.docente_id == docente_id)
+        .first()
+    ):
+        return True
+
+    # 3. Grupo ocupado
+    if (
+        db.query(Horario)
+        .join(Asignacion)
+        .filter(overlap_filter, Asignacion.grupo_id == grupo_id)
+        .first()
+    ):
+        return True
+
+    return False
 
 
-def _get_day_load(db: Session, docente_id: int, grupo_id: int) -> dict:
-    """
-    Obtener la carga actual de horarios por día para un docente y grupo.
-    
-    Args:
-        db: Sesión de base de datos
-        docente_id: ID del docente
-        grupo_id: ID del grupo
-        
-    Returns:
-        Diccionario con carga por día
-    """
-    from sqlalchemy import func
-    
-    # Contar horarios del docente por día
-    docente_load = db.query(
-        Horario.dia_semana,
-        func.count(Horario.id).label('count')
-    ).join(Asignacion).filter(
-        Asignacion.docente_id == docente_id,
-        Horario.activo == True
-    ).group_by(Horario.dia_semana).all()
-    
-    # Contar horarios del grupo por día
-    grupo_load = db.query(
-        Horario.dia_semana,
-        func.count(Horario.id).label('count')
-    ).join(Asignacion).filter(
-        Asignacion.grupo_id == grupo_id,
-        Horario.activo == True
-    ).group_by(Horario.dia_semana).all()
-    
-    # Combinar cargas
-    day_load = {}
-    for dia, count in docente_load:
-        day_load[dia] = day_load.get(dia, 0) + count
-    for dia, count in grupo_load:
-        day_load[dia] = day_load.get(dia, 0) + count
-    
-    return day_load
+# ── Búsqueda de aula ─────────────────────────────────────────────────────────
 
+def _buscar_aula(db: Session, dia: str, ini: time, fin: time,
+                 tipo_requerido: str, capacidad_min: int) -> Optional[Aula]:
+    """
+    Devuelve la primera aula activa del tipo y capacidad requeridos
+    que NO tenga solapamiento de Horario activo en el slot indicado.
+    """
+    tipo_lower = (tipo_requerido or "").lower()
 
-def _get_prioritized_slots(
-    db: Session,
-    asignacion: Asignacion,
-    day_load: dict,
-    num_sesiones: int
-) -> list:
-    """
-    Generar lista de slots priorizados para distribución óptima.
-    
-    Args:
-        db: Sesión de base de datos
-        asignacion: Asignación
-        day_load: Carga actual por día
-        num_sesiones: Número de sesiones a asignar
-        
-    Returns:
-        Lista de tuplas (día, hora_inicio, hora_fin, prioridad)
-    """
-    slots = []
-    
-    # Generar todos los slots posibles
-    for day in DAYS_OF_WEEK:
-        for hora_inicio, hora_fin in TIME_SLOTS:
-            # Calcular prioridad basada en:
-            # 1. Carga del día (menor carga = mayor prioridad)
-            # 2. Hora del día (horarios intermedios = mayor prioridad)
-            # 3. Distribución uniforme
-            
-            load_priority = 100 - day_load.get(day, 0) * 10
-            
-            # Priorizar horarios de 9:00-17:00 (más convenientes)
-            if time(9, 0) <= hora_inicio < time(17, 0):
-                time_priority = 50
-            elif time(7, 0) <= hora_inicio < time(9, 0):
-                time_priority = 30
-            else:
-                time_priority = 10
-            
-            # Prioridad total
-            priority = load_priority + time_priority
-            
-            slots.append((day, hora_inicio, hora_fin, priority))
-    
-    # Ordenar por prioridad (mayor a menor)
-    slots.sort(key=lambda x: x[3], reverse=True)
-    
-    return slots
-
-
-def _check_teacher_availability(
-    db: Session,
-    docente_id: int,
-    dia: str,
-    hora_inicio: time,
-    hora_fin: time
-) -> bool:
-    """
-    Verificar si un docente está disponible en un horario específico.
-    
-    Args:
-        db: Sesión de base de datos
-        docente_id: ID del docente
-        dia: Día de la semana
-        hora_inicio: Hora de inicio
-        hora_fin: Hora de fin
-        
-    Returns:
-        True si el docente está disponible, False en caso contrario
-    """
-    from app.models import DisponibilidadDocente
-    
-    # Si no hay disponibilidades registradas, asumir que está disponible
-    total_disponibilidades = db.query(DisponibilidadDocente).filter(
-        DisponibilidadDocente.docente_id == docente_id
-    ).count()
-    
-    if total_disponibilidades == 0:
-        return True  # Sin restricciones de disponibilidad
-    
-    # Buscar disponibilidades que cubran el horario solicitado
-    disponibilidades = db.query(DisponibilidadDocente).filter(
-        DisponibilidadDocente.docente_id == docente_id,
-        DisponibilidadDocente.dia_semana == dia,
-        DisponibilidadDocente.hora_inicio <= hora_inicio,
-        DisponibilidadDocente.hora_fin >= hora_fin
-    ).all()
-    
-    return len(disponibilidades) > 0
-
-
-def _check_teacher_max_hours(
-    db: Session,
-    docente_id: int,
-    ciclo_escolar: str,
-    horas_nuevas: int
-) -> bool:
-    """
-    Verificar si el docente excede sus horas máximas semanales.
-    
-    Args:
-        db: Sesión de base de datos
-        docente_id: ID del docente
-        ciclo_escolar: Ciclo escolar
-        horas_nuevas: Horas a asignar
-        
-    Returns:
-        True si puede aceptar las horas, False si excede
-    """
-    from app.models import Docente
-    from sqlalchemy import func
-    
-    docente = db.query(Docente).filter(Docente.id == docente_id).first()
-    if not docente:
-        return False
-    
-    # Calcular duración de horarios existentes
-    # Nota: SQLite no tiene diff de tiempo directo fácil en segundos con sum
-    # Traemos los horarios y sumamos en Python para ser agnósticos y precisos
-    horarios = db.query(Horario).join(Asignacion).filter(
-        Asignacion.docente_id == docente_id,
-        Asignacion.ciclo_escolar == ciclo_escolar,
-        Horario.activo == True
-    ).all()
-    
-    horas_asignadas = 0
-    for horario in horarios:
-        # Calcular duración en horas
-        inicio = datetime.combine(datetime.today(), horario.hora_inicio)
-        fin = datetime.combine(datetime.today(), horario.hora_fin)
-        duracion = (fin - inicio).total_seconds() / 3600
-        horas_asignadas += duracion
-    
-    return (horas_asignadas + horas_nuevas) <= docente.horas_maximas_semana
-
-
-def _find_available_classroom(
-    db: Session,
-    dia: str,
-    hora_inicio: time,
-    hora_fin: time,
-    tipo_aula: str,
-    capacidad_requerida: int,
-    exclude_asignacion_id: Optional[int] = None
-) -> Optional[Aula]:
-    """
-    Buscar un aula disponible que cumpla los requisitos.
-    
-    Args:
-        db: Sesión de base de datos
-        dia: Día de la semana
-        hora_inicio: Hora de inicio
-        hora_fin: Hora de fin
-        tipo_aula: Tipo de aula requerida
-        capacidad_requerida: Capacidad mínima requerida
-        exclude_asignacion_id: ID de asignación a excluir
-        
-    Returns:
-        Aula disponible o None
-    """
-    # Obtener aulas que cumplan requisitos básicos
-    aulas = db.query(Aula).filter(
+    query = db.query(Aula).filter(
         Aula.activo == True,
-        Aula.capacidad >= capacidad_requerida
-    ).all()
-    
-    # Filtrar por tipo si es necesario
-    if tipo_aula and tipo_aula != "aula":
-        aulas = [a for a in aulas if a.tipo.lower() == tipo_aula.lower()]
-    
-    # Verificar disponibilidad de cada aula
-    for aula in aulas:
-        # Verificar si el aula está ocupada en ese horario
-        conflictos = horario_service.check_conflicts(
-            db=db,
-            asignacion_id=exclude_asignacion_id or 1,  # Temporal
-            aula_id=aula.id,
-            dia_semana=dia,
-            hora_inicio=hora_inicio,
-            hora_fin=hora_fin
+        Aula.capacidad >= capacidad_min,
+    )
+    if tipo_lower and tipo_lower not in ("aula", "normal", ""):
+        query = query.filter(Aula.tipo.ilike(tipo_lower))
+
+    for aula in query.order_by(Aula.capacidad).all():   # preferir las más pequeñas que caben
+        ocupada = (
+            db.query(Horario)
+            .filter(
+                Horario.aula_id == aula.id,
+                Horario.dia_semana == dia,
+                Horario.activo == True,
+                or_(
+                    and_(Horario.hora_inicio <= ini, Horario.hora_fin > ini),
+                    and_(Horario.hora_inicio < fin,  Horario.hora_fin >= fin),
+                    and_(Horario.hora_inicio >= ini, Horario.hora_fin <= fin),
+                ),
+            )
+            .first()
         )
-        
-        # Filtrar solo conflictos de aula
-        aula_conflicts = [c for c in conflictos if c.tipo == "AULA_DOBLE_ASIGNACION"]
-        
-        if not aula_conflicts:
+        if not ocupada:
             return aula
-    
+
     return None
 
 
-def _clear_schedule(db: Session, ciclo_escolar: str):
+# ─── Lógica por asignación ────────────────────────────────────────────────────
+
+def _generar_para_asignacion(db: Session, asignacion: Asignacion,
+                              horas_usadas_docente: float) -> dict:
     """
-    Eliminar todos los horarios de un ciclo escolar.
-    
-    Args:
-        db: Sesión de base de datos
-        ciclo_escolar: Ciclo escolar a limpiar
+    Crea las sesiones semanales para una Asignación.
+
+    Parámetros:
+        horas_usadas_docente: horas ya acumuladas por el docente ANTES
+                              de procesar esta asignación (se actualiza
+                              externamente en generate_schedule).
+
+    Retorna:
+        {
+          "creados":      int,    # sesiones insertadas con éxito
+          "esperados":    int,    # sesiones que debían crearse
+          "horas_nuevas": float,  # horas efectivamente asignadas
+          "razon_falla":  str | None
+        }
     """
-    # Obtener horarios del ciclo
-    horarios = db.query(Horario).join(Asignacion).filter(
-        Asignacion.ciclo_escolar == ciclo_escolar
-    ).all()
-    
-    # Eliminar horarios (soft delete)
-    for horario in horarios:
-        horario.activo = False
-    
+    materia  = asignacion.materia
+    grupo    = asignacion.grupo
+    docente  = asignacion.docente
+
+    if not docente:
+        return {"creados": 0, "esperados": 1,
+                "horas_nuevas": 0.0, "razon_falla": "Asignación sin docente"}
+
+    horas_semana = materia.horas_semana or 2
+    num_sesiones = max(1, (horas_semana + 1) // 2)   # sesiones de ≈2 h
+    max_horas    = docente.horas_maximas_semana or 40
+
+    # Generar lista de todos los slots ordenados por prioridad
+    # (horario central 9-17 h > temprano > nocturno)
+    slots = []
+    for dia in DAYS_OF_WEEK:
+        for ini, fin in TIME_SLOTS:
+            if time(9, 0) <= ini < time(17, 0):
+                prio = 2
+            elif time(7, 0) <= ini < time(9, 0):
+                prio = 1
+            else:
+                prio = 0
+            slots.append((prio, dia, ini, fin))
+    slots.sort(key=lambda x: x[0], reverse=True)
+
+    creados      = 0
+    horas_nuevas = 0.0
+    razon_falla  = None
+
+    for i in range(num_sesiones):
+        # ── Tipo de sesión ──────────────────────────────────────────────
+        if materia.requiere_laboratorio and i == 0:
+            tipo_sesion = "laboratorio"
+            tipo_aula   = "laboratorio"
+        elif i % 2 == 0:
+            tipo_sesion = "teorica"
+            tipo_aula   = materia.tipo_aula_requerida or "aula"
+        else:
+            tipo_sesion = "practica"
+            tipo_aula   = materia.tipo_aula_requerida or "aula"
+
+        slot_ok = False
+        for prio, dia, ini, fin in slots:
+            dur = _horas(ini, fin)
+
+            # ① ¿Docente disponible en este slot? (réplica de check_docente_disponibilidad)
+            if not _docente_disponible(db, docente.id, dia, ini, fin):
+                continue
+
+            # ② ¿No supera horas máximas? (réplica de check_horas_maximas_docente)
+            if horas_usadas_docente + horas_nuevas + dur > max_horas:
+                razon_falla = (
+                    f"Docente alcanzó {max_horas}h máx "
+                    f"(lleva {horas_usadas_docente + horas_nuevas:.1f}h)"
+                )
+                continue
+
+            # ③ Buscar aula libre del tipo y capacidad requeridos
+            aula = _buscar_aula(db, dia, ini, fin, tipo_aula, grupo.num_estudiantes)
+            if not aula:
+                continue
+
+            # ④ Sin solapamiento de docente o grupo (réplica de check_conflicts)
+            if _hay_solapamiento(db, dia, ini, fin, aula.id, docente.id, grupo.id):
+                continue
+
+            # ── Todo OK: insertar Horario directamente ──────────────────
+            # (NO se usa create_horario para evitar que sus validaciones
+            #  internas lancen HTTPException absorbida en silencio)
+            try:
+                nuevo = Horario(
+                    asignacion_id=asignacion.id,
+                    aula_id=aula.id,
+                    dia_semana=dia,
+                    hora_inicio=ini,
+                    hora_fin=fin,
+                    tipo_sesion=tipo_sesion,
+                    activo=True,
+                )
+                db.add(nuevo)
+                db.commit()
+                db.refresh(nuevo)
+
+                creados      += 1
+                horas_nuevas += dur
+                slots.remove((prio, dia, ini, fin))
+                slot_ok = True
+                break
+
+            except Exception as exc:
+                db.rollback()
+                razon_falla = f"Error al insertar: {exc}"
+                continue
+
+        if not slot_ok and razon_falla is None:
+            razon_falla = (
+                "Sin slots disponibles "
+                "(disponibilidad del docente, horas máx o falta de aulas)"
+            )
+
+    return {
+        "creados":      creados,
+        "esperados":    num_sesiones,
+        "horas_nuevas": horas_nuevas,
+        "razon_falla":  razon_falla if creados < num_sesiones else None,
+    }
+
+
+# ─── Función pública principal ────────────────────────────────────────────────
+
+def generate_schedule(db: Session, ciclo_escolar: str,
+                      clear_existing: bool = False) -> dict:
+    """
+    Genera horarios automáticamente para todas las Asignaciones de un ciclo.
+
+    Parámetros:
+        ciclo_escolar:  p.ej. "2026-1"
+        clear_existing: si True, desactiva los Horarios existentes del ciclo
+                        antes de generar (soft-delete).
+
+    Retorna un resumen con:
+        ciclo_escolar, total_asignaciones, horarios_creados,
+        asignaciones_completadas, asignaciones_parciales,
+        asignaciones_fallidas[], detalles[]
+    """
+    if clear_existing:
+        _limpiar_horarios(db, ciclo_escolar)
+
+    asignaciones = (
+        db.query(Asignacion)
+        .options(
+            joinedload(Asignacion.materia),
+            joinedload(Asignacion.grupo),
+            joinedload(Asignacion.docente).joinedload(Docente.user),
+        )
+        .filter(Asignacion.ciclo_escolar == ciclo_escolar)
+        .all()
+    )
+
+    if not asignaciones:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontraron asignaciones para el ciclo '{ciclo_escolar}'",
+        )
+
+    stats = {
+        "ciclo_escolar":            ciclo_escolar,
+        "total_asignaciones":       len(asignaciones),
+        "horarios_creados":         0,
+        "asignaciones_completadas": 0,
+        "asignaciones_parciales":   0,
+        "asignaciones_fallidas":    [],
+        "detalles":                 [],
+    }
+
+    # Cache de horas ya usadas por docente (se actualiza con cada sesión creada)
+    horas_por_docente: dict[int, float] = {}
+
+    for asignacion in asignaciones:
+        did = asignacion.docente_id
+
+        # Inicializar el contador con las horas previas del docente
+        if did not in horas_por_docente:
+            horas_por_docente[did] = _docente_horas_usadas(db, did)
+
+        try:
+            res = _generar_para_asignacion(db, asignacion, horas_por_docente[did])
+        except Exception as exc:
+            stats["asignaciones_fallidas"].append({
+                "asignacion_id": asignacion.id,
+                "error": str(exc),
+            })
+            continue
+
+        # Actualizar el acumulador del docente para la siguiente asignación
+        horas_por_docente[did] += res["horas_nuevas"]
+
+        creados   = res["creados"]
+        esperados = res["esperados"]
+
+        # Nombre legible del docente
+        docente_nombre = "—"
+        if asignacion.docente and asignacion.docente.user:
+            u = asignacion.docente.user
+            docente_nombre = f"{u.nombre} {u.apellido}"
+
+        stats["horarios_creados"] += creados
+
+        if creados >= esperados:
+            stats["asignaciones_completadas"] += 1
+        elif creados > 0:
+            stats["asignaciones_parciales"] += 1
+        else:
+            stats["asignaciones_fallidas"].append({
+                "asignacion_id": asignacion.id,
+                "grupo":   asignacion.grupo.nombre   if asignacion.grupo   else "—",
+                "materia": asignacion.materia.nombre if asignacion.materia else "—",
+                "docente": docente_nombre,
+                "razon":   res.get("razon_falla") or "Sin slots disponibles",
+            })
+
+        stats["detalles"].append({
+            "asignacion_id":  asignacion.id,
+            "grupo":          asignacion.grupo.nombre   if asignacion.grupo   else "—",
+            "materia":        asignacion.materia.nombre if asignacion.materia else "—",
+            "docente":        docente_nombre,
+            "sesiones_esperadas": esperados,
+            "horarios_creados":   creados,
+            "razon_falla":        res.get("razon_falla"),
+        })
+
+    return stats
+
+
+# ─── Utilidades ───────────────────────────────────────────────────────────────
+
+def _limpiar_horarios(db: Session, ciclo_escolar: str) -> None:
+    """Soft-delete de todos los Horarios activos del ciclo."""
+    filas = (
+        db.query(Horario)
+        .join(Asignacion)
+        .filter(Asignacion.ciclo_escolar == ciclo_escolar, Horario.activo == True)
+        .all()
+    )
+    for h in filas:
+        h.activo = False
     db.commit()
 
 
 def get_schedule_summary(db: Session, ciclo_escolar: str) -> dict:
-    """
-    Obtener resumen del horario generado para un ciclo.
-    
-    Args:
-        db: Sesión de base de datos
-        ciclo_escolar: Ciclo escolar
-        
-    Returns:
-        Resumen del horario
-    """
-    # Contar horarios activos
-    horarios_count = db.query(Horario).join(Asignacion).filter(
-        Asignacion.ciclo_escolar == ciclo_escolar,
-        Horario.activo == True
-    ).count()
-    
-    # Contar asignaciones
-    asignaciones_count = db.query(Asignacion).filter(
-        Asignacion.ciclo_escolar == ciclo_escolar
-    ).count()
-    
-    # Contar conflictos no resueltos
-    from app.models import Conflicto
-    conflictos_count = db.query(Conflicto).join(Horario).join(Asignacion).filter(
-        Asignacion.ciclo_escolar == ciclo_escolar,
-        Conflicto.resuelto == False
-    ).count()
-    
+    """Resumen rápido del horario de un ciclo."""
+    from app.models.conflicto import Conflicto
+
+    total_h = (
+        db.query(Horario)
+        .join(Asignacion)
+        .filter(Asignacion.ciclo_escolar == ciclo_escolar, Horario.activo == True)
+        .count()
+    )
+    total_a = (
+        db.query(Asignacion)
+        .filter(Asignacion.ciclo_escolar == ciclo_escolar)
+        .count()
+    )
+    total_c = (
+        db.query(Conflicto)
+        .join(Horario)
+        .join(Asignacion)
+        .filter(
+            Asignacion.ciclo_escolar == ciclo_escolar,
+            Conflicto.resuelto == False,
+        )
+        .count()
+    )
+    sesiones_esp = total_a * 2
+    cobertura = f"{total_h / sesiones_esp * 100:.1f}%" if sesiones_esp else "0%"
+
     return {
-        "ciclo_escolar": ciclo_escolar,
-        "total_asignaciones": asignaciones_count,
-        "total_horarios": horarios_count,
-        "conflictos_pendientes": conflictos_count,
-        "cobertura": f"{(horarios_count / (asignaciones_count * 2) * 100):.1f}%" if asignaciones_count > 0 else "0%"
+        "ciclo_escolar":         ciclo_escolar,
+        "total_asignaciones":    total_a,
+        "total_horarios":        total_h,
+        "conflictos_pendientes": total_c,
+        "cobertura":             cobertura,
     }
