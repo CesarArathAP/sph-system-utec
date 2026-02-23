@@ -166,72 +166,72 @@ export default function ProfesoresLayout() {
 
   /* ── UI ────────────────────────────────────────────────────────── */
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <GraduationCap className="text-blue-600" size={28} />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Docentes</h1>
-            <p className="text-gray-500 text-sm">{total} docentes registrados</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <GraduationCap className="text-blue-600 shrink-0" size={26} />
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Docentes</h1>
+            <p className="text-gray-500 text-xs sm:text-sm">{total} docentes registrados</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button
             onClick={fetchDocentes}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition shrink-0"
             title="Actualizar lista"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin text-blue-500' : 'text-gray-500'} />
+            <RefreshCw size={14} className={`${loading ? 'animate-spin text-blue-500' : 'text-gray-500'} w-4 h-4 sm:w-5 sm:h-5`} />
           </button>
           <button
             onClick={() => { setSelectedDocente(null); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-sm"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-xs sm:text-sm"
           >
-            <Plus size={16} />
-            Nuevo docente
+            <Plus size={14} />
+            <span className="hidden sm:inline">Nuevo docente</span><span className="sm:hidden">+</span>
           </button>
         </div>
       </div>
 
       {/* Buscador */}
-      <div className="relative mb-5">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="relative mb-4 sm:mb-5">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
         <input
           type="text"
-          placeholder="Buscar por nombre, código, departamento o email..."
+          placeholder="Buscar docente, código, dept, email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
       {/* Estado carga / error */}
       {loading && (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-12 sm:py-16">
           <RefreshCw size={24} className="animate-spin text-blue-500" />
         </div>
       )}
       {error && !loading && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm mb-4">
           {error}
         </div>
       )}
 
       {/* Tabla */}
       {!loading && !error && (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+        <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm overflow-x-auto">
+          <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
+            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Código</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Nombre</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Departamento</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Hrs/semana</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Disponibilidad</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Código</th>
+                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Nombre</th>
+                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Email</th>
+                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Departamento</th>
+                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Hrs/semana</th>
+                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Disponibilidad</th>
+                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Estado</th>
+                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -245,45 +245,45 @@ export default function ProfesoresLayout() {
                 filtered.map((docente) => (
                   <tr key={docente.id} className="hover:bg-gray-50 transition">
                     {/* Código */}
-                    <td className="px-4 py-3 font-mono font-semibold text-gray-800">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 font-mono font-semibold text-gray-800 text-xs sm:text-sm">
                       {docente.codigo_docente}
                     </td>
 
                     {/* Nombre completo */}
-                    <td className="px-4 py-3">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3">
                       {docente.user ? (
                         <button
                           onClick={() => { setSelectedDocente(docente); setIsHorarioOpen(true); }}
-                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition"
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition text-xs sm:text-sm"
                           title="Ver horario del docente"
                         >
                           {docente.user.nombre} {docente.user.apellido}
                         </button>
                       ) : (
-                        <span className="text-gray-400 italic">Sin usuario vinculado</span>
+                        <span className="text-gray-400 italic text-xs sm:text-sm">Sin usuario vinculado</span>
                       )}
                     </td>
 
                     {/* Email */}
-                    <td className="px-4 py-3 text-gray-600 text-xs">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 text-xs">
                       {docente.user?.email ?? <span className="text-gray-400">—</span>}
                     </td>
 
                     {/* Departamento */}
-                    <td className="px-4 py-3 text-gray-700 max-w-xs truncate" title={docente.departamento ?? ''}>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-700 max-w-xs truncate text-xs sm:text-sm" title={docente.departamento ?? ''}>
                       {docente.departamento ?? <span className="text-gray-400">—</span>}
                     </td>
 
                     {/* Horas máximas */}
-                    <td className="px-4 py-3 text-center text-gray-700">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-700 text-xs sm:text-sm">
                       {docente.horas_maximas_semana}h
                     </td>
 
                     {/* Disponibilidades */}
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                       <button
                         onClick={() => { setSelectedDocente(docente); setIsDisponibilidadOpen(true); }}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition whitespace-nowrap"
                         title="Ver disponibilidad"
                       >
                         <CalendarDays size={11} />
@@ -292,14 +292,14 @@ export default function ProfesoresLayout() {
                     </td>
 
                     {/* Estado */}
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${docente.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold inline-block ${docente.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                         {docente.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
 
                     {/* Acciones */}
-                    <td className="px-4 py-3">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => { setSelectedDocente(docente); setIsModalOpen(true); }}
