@@ -37,20 +37,20 @@ function KpiCard({
     colorClass: string; subtext?: string;
 }) {
     return (
-        <div className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col gap-3`}>
-            <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</span>
-                <span className={`p-2 rounded-xl ${colorClass}`}>
-                    <Icon size={16} strokeWidth={2} />
+        <div className={`bg-white border border-gray-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm flex flex-col gap-2 sm:gap-3`}>
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 truncate">{label}</span>
+                <span className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl shrink-0 ${colorClass}`}>
+                    <Icon size={16} strokeWidth={2} className="w-4 h-4 sm:w-5 sm:h-5" />
                 </span>
             </div>
-            <div>
+            <div className="min-w-0">
                 {value === null ? (
-                    <div className="h-8 w-12 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-6 sm:h-8 w-10 sm:w-12 bg-gray-100 rounded animate-pulse" />
                 ) : (
-                    <p className="text-3xl font-bold text-gray-800">{value}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-800 truncate">{value}</p>
                 )}
-                {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
+                {subtext && <p className="text-xs text-gray-400 mt-0.5 sm:mt-1 line-clamp-1">{subtext}</p>}
             </div>
         </div>
     );
@@ -60,14 +60,14 @@ function KpiCard({
 function Bar({ label, value, max, colorClass }: { label: string; value: number; max: number; colorClass: string }) {
     const pct = max > 0 ? Math.round((value / max) * 100) : 0;
     return (
-        <div>
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>{label}</span>
-                <span className="font-medium text-gray-700">{value} <span className="text-gray-400">/ {max}</span></span>
+        <div className="min-w-0">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-xs text-gray-500 mb-1 sm:mb-2">
+                <span className="truncate">{label}</span>
+                <span className="font-medium text-gray-700 whitespace-nowrap">{value} <span className="text-gray-400">/ {max}</span></span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
+            <div className="w-full bg-gray-100 rounded-full h-1.5 sm:h-2">
                 <div
-                    className={`h-2 rounded-full ${colorClass} transition-all duration-700`}
+                    className={`h-1.5 sm:h-2 rounded-full ${colorClass} transition-all duration-700`}
                     style={{ width: `${pct}%` }}
                 />
             </div>
@@ -127,18 +127,18 @@ export default function HomeDashboard() {
     const greeting = hora < 12 ? '¡Buenos días' : hora < 19 ? '¡Buenas tardes' : '¡Buenas noches';
 
     return (
-        <div className="p-6 md:p-8 max-w-6xl space-y-8">
+        <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
 
             {/* ── Header ── */}
-            <div className="flex items-start gap-4">
-                <div className="p-3 bg-blue-600 rounded-2xl shadow-md shadow-blue-200">
-                    <BarChart3 size={22} className="text-white" />
+            <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                <div className="p-2 sm:p-3 bg-blue-600 rounded-2xl shadow-md shadow-blue-200 shrink-0">
+                    <BarChart3 size={20} className="text-white sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                         {user ? `${greeting}, ${user.nombre}!` : 'Bienvenido'}
                     </h1>
-                    <p className="text-sm text-gray-400 mt-0.5">
+                    <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
                         Ciclo escolar activo · Panel de estadísticas
                     </p>
                 </div>
@@ -147,7 +147,7 @@ export default function HomeDashboard() {
             {/* ── KPIs principales ── */}
             <section>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Recursos del sistema</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <KpiCard label="Docentes" value={stats?.docentes ?? null} Icon={GraduationCap} colorClass="bg-blue-50 text-blue-600" subtext="activos en el sistema" />
                     <KpiCard label="Aulas" value={stats?.aulas ?? null} Icon={Building2} colorClass="bg-emerald-50 text-emerald-600" subtext="espacios disponibles" />
                     <KpiCard label="Materias" value={stats?.materias ?? null} Icon={BookOpen} colorClass="bg-violet-50 text-violet-600" subtext="en el catálogo" />
@@ -158,7 +158,7 @@ export default function HomeDashboard() {
             {/* ── Horarios KPIs ── */}
             <section>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Estado del ciclo</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     <KpiCard label="Asignaciones" value={stats?.asignaciones ?? null} Icon={BookCopy} colorClass="bg-sky-50 text-sky-600" subtext="docente–grupo–materia" />
                     <KpiCard label="Horarios" value={stats?.horarios ?? null} Icon={Calendar} colorClass="bg-indigo-50 text-indigo-600" subtext="sesiones programadas" />
                     <div className={`bg-white border rounded-2xl p-5 shadow-sm flex flex-col gap-3 ${(stats?.conflictos ?? 0) > 0
@@ -190,12 +190,12 @@ export default function HomeDashboard() {
             </section>
 
             {/* ── Desglose aulas + cobertura ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
 
                 {/* Tipos de aula */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-center gap-2 mb-5">
-                        <Layers size={16} className="text-gray-400" />
+                <div className="bg-white border border-gray-100 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                        <Layers size={16} className="text-gray-400 shrink-0" />
                         <h3 className="text-sm font-semibold text-gray-700">Distribución de aulas</h3>
                     </div>
                     {loading ? (
@@ -203,7 +203,7 @@ export default function HomeDashboard() {
                             {[1, 2, 3].map(i => <div key={i} className="h-4 bg-gray-100 rounded animate-pulse" />)}
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                             {Object.entries(aulaBreakdown).map(([tipo, n]) => {
                                 const colors: Record<string, string> = {
                                     normal: 'bg-blue-500',
@@ -229,9 +229,9 @@ export default function HomeDashboard() {
                 </div>
 
                 {/* Cobertura de asignaciones */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-center gap-2 mb-5">
-                        <Clock size={16} className="text-gray-400" />
+                <div className="bg-white border border-gray-100 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                        <Clock size={16} className="text-gray-400 shrink-0" />
                         <h3 className="text-sm font-semibold text-gray-700">Cobertura del ciclo</h3>
                     </div>
                     {loading ? (
@@ -239,7 +239,7 @@ export default function HomeDashboard() {
                             {[1, 2].map(i => <div key={i} className="h-4 bg-gray-100 rounded animate-pulse" />)}
                         </div>
                     ) : (
-                        <div className="space-y-5">
+                        <div className="space-y-4 sm:space-y-5">
                             <Bar
                                 label="Sesiones por asignación (promedio)"
                                 value={stats && stats.asignaciones > 0
@@ -262,18 +262,18 @@ export default function HomeDashboard() {
                             />
 
                             {/* resumen texto */}
-                            <div className="mt-2 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3 text-center">
-                                <div>
-                                    <p className="text-lg font-bold text-gray-800">{stats?.horarios ?? '—'}</p>
-                                    <p className="text-xs text-gray-400">sesiones totales</p>
+                            <div className="mt-2 pt-3 sm:pt-4 border-t border-gray-100 grid grid-cols-2 gap-2 sm:gap-3 text-center">
+                                <div className="min-w-0">
+                                    <p className="text-base sm:text-lg font-bold text-gray-800 truncate">{stats?.horarios ?? '—'}</p>
+                                    <p className="text-xs text-gray-400 line-clamp-1">sesiones totales</p>
                                 </div>
-                                <div>
-                                    <p className="text-lg font-bold text-gray-800">
+                                <div className="min-w-0">
+                                    <p className="text-base sm:text-lg font-bold text-gray-800 truncate">
                                         {stats && stats.asignaciones > 0
                                             ? `${Math.round((stats.horarios / (stats.asignaciones * 2)) * 100)}%`
                                             : '—'}
                                     </p>
-                                    <p className="text-xs text-gray-400">cobertura 2 ses./semana</p>
+                                    <p className="text-xs text-gray-400 line-clamp-1">cobertura 2 ses./semana</p>
                                 </div>
                             </div>
                         </div>
