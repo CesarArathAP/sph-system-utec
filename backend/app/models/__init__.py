@@ -10,6 +10,7 @@ from app.models.grupo import Grupo, TurnoEnum
 from app.models.asignacion import Asignacion
 from app.models.horario import Horario, TipoSesionEnum
 from app.models.conflicto import Conflicto, TipoConflictoEnum
+from app.models.horario_version import HorarioVersion
 
 __all__ = [
     # Modelos
@@ -21,6 +22,7 @@ __all__ = [
     "Grupo",
     "Asignacion",
     "Horario",
+    "HorarioVersion",
     "Conflicto",
     # Enums
     "RolEnum",

@@ -10,6 +10,7 @@ from datetime import time, datetime
 from app.models import Horario, Asignacion, Aula, Grupo, Materia, Docente, DisponibilidadDocente
 from app.models.conflicto import Conflicto
 from app.schemas.horario import HorarioCreate, HorarioUpdate, ConflictoResponse
+from app.services import horario_version_service
 
 DIAS_ES = {
     "lunes": "lunes", "martes": "martes", "miercoles": "miércoles",
@@ -489,6 +490,21 @@ def create_horario(db: Session, horario_data: HorarioCreate, allow_conflicts: bo
     db.commit()
     db.refresh(db_horario)
     
+    # Registrar versión de creación
+    estado_nuevo = horario_version_service.snapshot_horario(db_horario)
+    horario_version_service.registrar_version(
+        db=db,
+        horario_id=db_horario.id,
+        tipo_cambio="creacion",
+        descripcion_cambio=f"Horario creado: {horario_data.dia_semana} {horario_data.hora_inicio}-{horario_data.hora_fin}",
+        ciclo_escolar=asignacion.ciclo_escolar,
+        estado_anterior=None,
+        estado_nuevo=estado_nuevo,
+        razon_cambio=None,
+        usuario_id=None,
+        usuario_nombre=None,
+    )
+    
     # Si hay conflictos, registrarlos en la tabla
     if conflictos:
         for conflicto_data in conflictos:
@@ -578,8 +594,41 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
     for field, value in update_data.items():
         setattr(horario, field, value)
 
+    # Registrar versión de actualización
+    estado_anterior = horario_version_service.snapshot_horario(horario)
+    
     db.commit()
     db.refresh(horario)
+    
+    estado_nuevo = horario_version_service.snapshot_horario(horario)
+    
+    # Describir qué cambió
+    cambios = []
+    if 'dia_semana' in update_data:
+        cambios.append(f"Día: {horario.dia_semana.value}")
+    if 'hora_inicio' in update_data or 'hora_fin' in update_data:
+        cambios.append(f"Hora: {horario.hora_inicio}-{horario.hora_fin}")
+    if 'aula_id' in update_data:
+        cambios.append(f"Aula: {aula_id}")
+    if 'tipo_sesion' in update_data:
+        cambios.append(f"Tipo: {horario.tipo_sesion.value}")
+    if 'asignacion_id' in update_data:
+        cambios.append(f"Asignación: {asignacion_id}")
+    
+    descripcion = "Modificado: " + ", ".join(cambios) if cambios else "Modificado"
+    
+    horario_version_service.registrar_version(
+        db=db,
+        horario_id=horario_id,
+        tipo_cambio="modificacion",
+        descripcion_cambio=descripcion,
+        ciclo_escolar=horario.asignacion.ciclo_escolar,
+        estado_anterior=estado_anterior,
+        estado_nuevo=estado_nuevo,
+        razon_cambio=None,
+        usuario_id=None,
+        usuario_nombre=None,
+    )
 
     # ── Marcar conflictos existentes como resueltos ──────────────────────
     conflictos_anteriores = (
