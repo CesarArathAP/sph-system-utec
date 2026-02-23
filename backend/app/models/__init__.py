@@ -11,6 +11,7 @@ from app.models.asignacion import Asignacion
 from app.models.horario import Horario, TipoSesionEnum
 from app.models.conflicto import Conflicto, TipoConflictoEnum
 from app.models.horario_version import HorarioVersion
+from app.models.horario_snapshot import HorarioSnapshot
 
 __all__ = [
     # Modelos
@@ -23,6 +24,7 @@ __all__ = [
     "Asignacion",
     "Horario",
     "HorarioVersion",
+    "HorarioSnapshot",
     "Conflicto",
     # Enums
     "RolEnum",

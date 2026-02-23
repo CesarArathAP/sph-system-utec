@@ -71,3 +71,8 @@ Thumbs.db
 # ============================================================
 *.bak
 *.tmp
+
+clean_db.py
+diagnostico_horas.py
+regen_horarios.py
+seed_db.py

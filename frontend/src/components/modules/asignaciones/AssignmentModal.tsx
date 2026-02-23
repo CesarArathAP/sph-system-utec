@@ -26,10 +26,23 @@ interface AulaOption {
   capacidad: number;
 }
 
+interface Diagnostico {
+  tipo: 'warning' | 'critica';
+  titulo: string;
+  mensaje: string;
+  detalles?: string | string[] | Record<string, any>;
+  sugerencia?: string;
+  [key: string]: unknown;
+}
+
 interface GenerateResult {
   horarios_creados?: number;
   conflictos_detectados?: number;
-  asignaciones_fallidas?: number;
+  asignaciones_fallidas?: any[];
+  asignaciones_parciales?: number;
+  asignaciones_completadas?: number;
+  diagnosticos?: Diagnostico[];
+  alertas?: Diagnostico[];
   mensaje?: string;
   [key: string]: unknown;
 }
@@ -400,36 +413,113 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
                   </p>
                 </div>
 
-                {/* Resultado exitoso */}
+                {/* Resultado con diagnósticos */}
                 {genResult && !generating && (
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-green-700 font-semibold text-sm">
-                      <CheckCircle size={16} /> Generación completada
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      <div className="bg-white border border-green-200 rounded-lg py-2">
-                        <div className="text-xl font-bold text-green-600">
-                          {genResult.horarios_creados ?? 0}
+                  <div className="space-y-4">
+                    {/* Alertas críticas */}
+                    {genResult.alertas && genResult.alertas.length > 0 && (
+                      <div className="bg-red-50 border-2 border-red-300 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center gap-2.5 text-red-800 font-bold text-base">
+                          <AlertTriangle size={20} /> ❌ No se pudo generar el horario
                         </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">Horarios creados</div>
-                      </div>
-                      <div className="bg-white border border-yellow-200 rounded-lg py-2">
-                        <div className="text-xl font-bold text-yellow-600">
-                          {genResult.conflictos_detectados ?? 0}
+                        <div className="space-y-3.5">
+                          {genResult.alertas.map((alerta: any, idx: number) => (
+                            <div key={idx} className="bg-white rounded-lg px-4 py-3 border border-red-200 shadow-sm">
+                              <p className="font-bold text-red-800 text-sm">{alerta.titulo}</p>
+                              <p className="text-red-700 text-xs mt-2 leading-relaxed">{alerta.mensaje}</p>
+                              {alerta.detalles && (
+                                <div className="mt-3 bg-red-100/50 rounded-lg px-3 py-2.5 border border-red-200">
+                                  {typeof alerta.detalles === 'string' ? (
+                                    <p className="text-xs text-red-800">{alerta.detalles}</p>
+                                  ) : Array.isArray(alerta.detalles) ? (
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-semibold text-red-800 mb-2">Docentes afectados:</p>
+                                      <ul className="text-xs text-red-700 space-y-1">
+                                        {alerta.detalles.map((d: any, i: number) => (
+                                          <li key={i} className="flex items-center gap-1.5">
+                                            <span className="inline-block w-1.5 h-1.5 bg-red-600 rounded-full"></span>
+                                            {d}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      {Object.entries(alerta.detalles).map(([k, v]: [string, any]) => (
+                                        <div key={k} className="text-xs text-red-700">
+                                          <span className="font-semibold">{k}:</span> {v}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {alerta.sugerencia && (
+                                <div className="mt-3 bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-200">
+                                  <p className="text-xs text-blue-800">
+                                    <span className="font-semibold">💡 Solución:</span> {alerta.sugerencia}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">Conflictos</div>
                       </div>
-                      <div className="bg-white border border-red-200 rounded-lg py-2">
-                        <div className="text-xl font-bold text-red-500">
-                          {genResult.asignaciones_fallidas ?? 0}
+                    )}
+
+                    {/* Resultado exitoso (solo si NO hay alertas críticas) */}
+                    {(!genResult.alertas || genResult.alertas.length === 0) && (
+                      <div className="bg-green-50 border-2 border-green-300 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center gap-2.5 text-green-800 font-bold text-base">
+                          <CheckCircle size={20} /> ✅ Generación completada exitosamente
                         </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">Fallidas</div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-white border-2 border-green-200 rounded-lg py-3 px-2 text-center shadow-sm">
+                            <div className="text-2xl font-bold text-green-600">
+                              {genResult.horarios_creados ?? 0}
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1 font-medium">Creados</div>
+                          </div>
+                          <div className="bg-white border-2 border-yellow-200 rounded-lg py-3 px-2 text-center shadow-sm">
+                            <div className="text-2xl font-bold text-yellow-600">
+                              {genResult.asignaciones_parciales ?? 0}
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1 font-medium">Parciales</div>
+                          </div>
+                          <div className="bg-white border-2 border-red-200 rounded-lg py-3 px-2 text-center shadow-sm">
+                            <div className="text-2xl font-bold text-red-600">
+                              {genResult.asignaciones_fallidas?.length ?? 0}
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1 font-medium">Fallidas</div>
+                          </div>
+                        </div>
+                        <button onClick={onClose}
+                          className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition shadow-md">
+                          Ver horarios generados →
+                        </button>
                       </div>
-                    </div>
-                    <button onClick={onClose}
-                      className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition">
-                      Ver horarios generados
-                    </button>
+                    )}
+
+                    {/* Advertencias (warnings) */}
+                    {genResult.diagnosticos && genResult.diagnosticos.filter((d: any) => d.tipo === 'warning').length > 0 && (
+                      <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-5 space-y-3">
+                        <div className="flex items-center gap-2.5 text-yellow-800 font-bold text-sm">
+                          <AlertTriangle size={18} /> ⚠️ Advertencias
+                        </div>
+                        {genResult.diagnosticos
+                          .filter((d: any) => d.tipo === 'warning')
+                          .map((warning: any, idx: number) => (
+                            <div key={idx} className="bg-white rounded-lg px-3.5 py-2.5 border border-yellow-200 shadow-sm">
+                              <p className="text-yellow-800 text-xs font-semibold">{warning.titulo}</p>
+                              <p className="text-yellow-700 text-xs mt-1 leading-relaxed">{warning.mensaje}</p>
+                              {warning.sugerencia && (
+                                <p className="text-xs text-yellow-700 mt-2 font-medium">💡 {warning.sugerencia}</p>
+                              )}
+                            </div>
+                          ))
+                        }
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -72,6 +72,79 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
     });
   };
 
+  /* Llenar todo (respetando horas máximas del docente) */
+  const handleFillAll = () => {
+    if (!docente) return;
+    
+    const maxHoras = docente.horas_maximas_semana || 40;
+    const newSelected = new Set<string>();
+    
+    // Estrategia: Llenar primero horario central (9-17), luego mañana/tarde
+    // Distribuir uniformemente entre L-V
+    
+    // Definir categorías de horarios por preferencia
+    const centralHours = TIME_SLOTS.filter(s => {
+      const h = parseInt(s.inicio);
+      return h >= 9 && h < 17; // 09:00 - 17:00
+    }); // 8 slots
+    
+    const morningHours = TIME_SLOTS.filter(s => {
+      const h = parseInt(s.inicio);
+      return h >= 7 && h < 9; // 07:00 - 09:00
+    }); // 2 slots
+    
+    const eveningHours = TIME_SLOTS.filter(s => {
+      const h = parseInt(s.inicio);
+      return h >= 17 && h < 21; // 17:00 - 21:00
+    }); // 4 slots
+    
+    let totalHorasLlenadas = 0;
+    const horasMaxPorDia = Math.ceil(maxHoras / 5); // Distribuir entre 5 días hábiles
+    
+    // Llenar cada día
+    for (const day of DAYS) {
+      if (totalHorasLlenadas >= maxHoras) break;
+      
+      let horasDelDia = 0;
+      
+      // Primero: Horario central (9-17)
+      for (const slot of centralHours) {
+        if (horasDelDia >= horasMaxPorDia || totalHorasLlenadas >= maxHoras) break;
+        const key = `${day.value}|${slot.inicio}`;
+        newSelected.add(key);
+        horasDelDia++;
+        totalHorasLlenadas++;
+      }
+      
+      // Segundo: Mañana temprana (7-9)
+      for (const slot of morningHours) {
+        if (horasDelDia >= horasMaxPorDia || totalHorasLlenadas >= maxHoras) break;
+        const key = `${day.value}|${slot.inicio}`;
+        newSelected.add(key);
+        horasDelDia++;
+        totalHorasLlenadas++;
+      }
+      
+      // Tercero: Tarde/Noche (17-21)
+      for (const slot of eveningHours) {
+        if (horasDelDia >= horasMaxPorDia || totalHorasLlenadas >= maxHoras) break;
+        const key = `${day.value}|${slot.inicio}`;
+        newSelected.add(key);
+        horasDelDia++;
+        totalHorasLlenadas++;
+      }
+    }
+    
+    setSelected(newSelected);
+  };
+
+  /* Limpiar todo */
+  const handleClearAll = () => {
+    if (window.confirm('¿Seguro que deseas limpiar toda la disponibilidad?')) {
+      setSelected(new Set());
+    }
+  };
+
   /* DELETE de todas las disponibilidades actuales + POST de las nuevas */
   const handleSave = async () => {
     if (!docente?.id) return;
@@ -111,6 +184,12 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
   };
 
   const countSelected = selected.size;
+  
+  // Validar que no supere horas máximas
+  const maxHoras = docente?.horas_maximas_semana || 40;
+  const horasSeleccionadas = countSelected;
+  const exceedsMaxHours = horasSeleccionadas > maxHoras;
+  const horasExcedidas = horasSeleccionadas - maxHoras;
 
   return (
     <Dialog.Root open={isOpen && !!docente} onOpenChange={(open) => !open && onClose()}>
@@ -155,17 +234,29 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
               <p className="text-sm text-gray-500">
                 Haz clic en las celdas para marcar los horarios disponibles.
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelected(new Set())}
-                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition"
-                  title="Limpiar todo"
+                  onClick={handleFillAll}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition"
+                  title="Llenar todo respetando horas máximas"
                 >
-                  <Trash2 size={12} /> Limpiar todo
+                  <RefreshCw size={13} /> Llenar todo
                 </button>
-                <span className="text-sm font-semibold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                  {countSelected} horas seleccionadas
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
+                  title="Limpiar toda la disponibilidad"
+                >
+                  <Trash2 size={13} /> Limpiar todo
+                </button>
+                <span className={`text-sm font-semibold px-3 py-1 rounded-full ml-2 ${
+                  exceedsMaxHours 
+                    ? 'bg-red-100 text-red-700' 
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {horasSeleccionadas} / {maxHoras}h
                 </span>
               </div>
             </div>
@@ -174,6 +265,14 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
             {error && (
               <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
                 {error}
+              </div>
+            )}
+
+            {/* Advertencia de horas excedidas */}
+            {exceedsMaxHours && (
+              <div className="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm font-medium">
+                ⚠️ Excedes el límite máximo en {horasExcedidas} {horasExcedidas === 1 ? 'hora' : 'horas'}. 
+                Máximo permitido: {maxHoras}h
               </div>
             )}
 
@@ -250,8 +349,13 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-60"
+              disabled={saving || exceedsMaxHours}
+              title={exceedsMaxHours ? `No puedes exceder ${maxHoras}h. Quita ${horasExcedidas} ${horasExcedidas === 1 ? 'hora' : 'horas'}.` : ''}
+              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition ${
+                exceedsMaxHours
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60'
+              }`}
             >
               {saving && <RefreshCw size={14} className="animate-spin" />}
               {saving ? 'Guardando...' : 'Guardar disponibilidad'}

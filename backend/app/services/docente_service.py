@@ -268,8 +268,37 @@ def replace_disponibilidad(
 
     Elimina todos los bloques existentes e inserta los nuevos.
     Si la lista llega vacía, el docente queda sin disponibilidad.
+    
+    Validación:
+        - El total de horas no puede exceder horas_maximas_semana del docente
+    
+    Raises:
+        HTTPException 422: Si el total de horas seleccionadas excede el máximo
     """
     docente = get_docente_by_id(db, docente_id)
+    
+    # ─ Validar límite de horas ─
+    max_horas = docente.horas_maximas_semana or 40
+    total_horas = len(disponibilidades)  # Cada slot = 1 hora
+    
+    if total_horas > max_horas:
+        horas_excedidas = total_horas - max_horas
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "mensaje": (
+                    f"No se puede registrar {total_horas}h. "
+                    f"El docente '{docente.user.nombre if docente.user else 'N/A'}' "
+                    f"tiene un máximo de {max_horas}h semanales."
+                ),
+                "disponibilidad": {
+                    "horas_solicitadas": total_horas,
+                    "horas_maximas": max_horas,
+                    "horas_excedidas": horas_excedidas,
+                    "sugerencia": f"Reduce la disponibilidad en al menos {horas_excedidas} {horas_excedidas == 1 and 'hora' or 'horas'}"
+                }
+            }
+        )
 
     # 1. Borrar todo lo existente
     db.query(DisponibilidadDocente).filter(
