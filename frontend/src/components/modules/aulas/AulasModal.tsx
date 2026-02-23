@@ -65,18 +65,18 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
         {/* Contenido */}
         <Dialog.Content
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
-                     bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh]
+                     bg-white rounded-xl shadow-2xl w-11/12 sm:w-full max-w-2xl max-h-[90vh]
                      overflow-y-auto focus:outline-none"
           onEscapeKeyDown={onClose}
         >
           {/* Header */}
-          <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 bg-white rounded-t-xl">
-            <Dialog.Title className="text-xl font-bold text-gray-800">
+          <div className="border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center sticky top-0 bg-white rounded-t-xl">
+            <Dialog.Title className="text-lg sm:text-xl font-bold text-gray-800">
               {isEditing ? 'Editar Aula' : 'Crear Aula'}
             </Dialog.Title>
             <Dialog.Close
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-700 text-2xl leading-none transition"
+              className="text-gray-400 hover:text-gray-700 text-2xl leading-none transition shrink-0"
               aria-label="Cerrar"
             >
               ×
@@ -84,7 +84,7 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
           </div>
 
           {/* Formulario */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
             {/* Código */}
             <div>
