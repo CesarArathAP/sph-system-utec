@@ -187,23 +187,23 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
 
   /* ── Vista lista (tabla simple) ───────────────────────────────────── */
   const renderList = () => (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      <table className="w-full text-sm">
+    <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm overflow-x-auto">
+      <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th className="text-left px-4 py-3 font-semibold text-gray-600">Día</th>
-            <th className="text-left px-4 py-3 font-semibold text-gray-600">Hora</th>
-            <th className="text-left px-4 py-3 font-semibold text-gray-600">Materia</th>
-            <th className="text-left px-4 py-3 font-semibold text-gray-600">Grupo</th>
-            <th className="text-left px-4 py-3 font-semibold text-gray-600">Docente</th>
-            <th className="text-left px-4 py-3 font-semibold text-gray-600">Aula</th>
-            <th className="text-center px-4 py-3 font-semibold text-gray-600">Tipo</th>
+            <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600">Día</th>
+            <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600">Hora</th>
+            <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600 hidden sm:table-cell">Materia</th>
+            <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">Grupo</th>
+            <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600 hidden lg:table-cell">Docente</th>
+            <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600">Aula</th>
+            <th className="text-center px-2 sm:px-4 py-3 font-semibold text-gray-600">Tipo</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {horarios.length === 0 ? (
             <tr>
-              <td colSpan={7} className="text-center py-12 text-gray-400">No hay horarios registrados</td>
+              <td colSpan={7} className="text-center py-8 sm:py-12 text-gray-400 px-4">No hay horarios registrados</td>
             </tr>
           ) : (
             [...horarios].sort((a, b) => {
@@ -213,25 +213,25 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
               <tr key={h.id}
                 onClick={() => setDetailId(h.id)}
                 className={`hover:bg-blue-50 cursor-pointer transition ${!h.activo ? 'opacity-40' : ''}`}>
-                <td className="px-4 py-3 capitalize text-gray-700">{h.dia_semana}</td>
-                <td className="px-4 py-3 text-gray-600 font-mono text-xs">
+                <td className="px-2 sm:px-4 py-3 capitalize text-gray-700 font-medium text-xs sm:text-sm">{h.dia_semana}</td>
+                <td className="px-2 sm:px-4 py-3 text-gray-600 font-mono text-[11px] sm:text-xs whitespace-nowrap">
                   {h.hora_inicio.slice(0, 5)} – {h.hora_fin.slice(0, 5)}
                 </td>
-                <td className="px-4 py-3 font-medium text-gray-800">
+                <td className="px-2 sm:px-4 py-3 font-medium text-gray-800 hidden sm:table-cell truncate">
                   {h.asignacion?.materia?.nombre ?? <span className="text-gray-400">—</span>}
                   {h.asignacion?.materia?.codigo_materia && (
-                    <span className="ml-1 text-xs text-gray-400">({h.asignacion.materia.codigo_materia})</span>
+                    <span className="ml-1 text-xs text-gray-400 block sm:inline">({h.asignacion.materia.codigo_materia})</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-700">{h.asignacion?.grupo?.nombre ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-700 text-sm">
+                <td className="px-2 sm:px-4 py-3 text-gray-700 hidden md:table-cell text-xs sm:text-sm">{h.asignacion?.grupo?.nombre ?? '—'}</td>
+                <td className="px-2 sm:px-4 py-3 text-gray-700 text-xs hidden lg:table-cell">
                   {h.asignacion?.docente?.user
                     ? `${h.asignacion.docente.user.nombre} ${h.asignacion.docente.user.apellido}`
                     : h.asignacion?.docente?.codigo_docente ?? '—'}
                 </td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{h.aula?.nombre ?? '—'}</td>
-                <td className="px-4 py-3 text-center">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                <td className="px-2 sm:px-4 py-3 text-gray-600 text-[11px] sm:text-xs truncate">{h.aula?.nombre ?? '—'}</td>
+                <td className="px-2 sm:px-4 py-3 text-center">
+                  <span className={`text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border whitespace-nowrap inline-block ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                     {TIPO_LABEL[h.tipo_sesion] ?? h.tipo_sesion}
                   </span>
                 </td>
@@ -245,15 +245,16 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
 
   /* ── Vista grid ───────────────────────────────────────────────────── */
   const renderGrid = () => (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm overflow-x-auto">
-      <table className="text-xs border-collapse min-w-[700px]">
+    <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm overflow-x-auto">
+      <table className="text-xs border-collapse min-w-full sm:min-w-[700px]">
         <thead>
           <tr className="bg-gray-50 border-b-2 border-gray-200">
-            <th className="px-3 py-3 text-left font-semibold text-gray-600 w-20 sticky left-0 bg-gray-50 z-10">Hora</th>
+            <th className="px-2 sm:px-3 py-2 sm:py-3 text-left font-semibold text-gray-600 w-16 sm:w-20 sticky left-0 bg-gray-50 z-10 text-xs sm:text-sm">Hora</th>
             {DAYS.map(({ label, value }) =>
               (!filterDia || filterDia === value) ? (
-                <th key={value} className="px-2 py-3 text-center font-semibold text-gray-600 min-w-[130px]">
-                  {label}
+                <th key={value} className="px-1 sm:px-2 py-2 sm:py-3 text-center font-semibold text-gray-600 min-w-[100px] sm:min-w-[130px] text-xs sm:text-sm">
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{label.slice(0, 3)}</span>
                 </th>
               ) : null
             )}
@@ -264,29 +265,29 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
             const hourInt = parseInt(hourStr, 10);
             return (
               <tr key={hourStr} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
-                <td className="px-3 py-2 font-mono text-gray-500 text-[11px] border-r border-gray-200 sticky left-0 bg-inherit z-10 whitespace-nowrap">
+                <td className="px-2 sm:px-3 py-1 sm:py-2 font-mono text-gray-500 text-[10px] sm:text-[11px] border-r border-gray-200 sticky left-0 bg-inherit z-10 whitespace-nowrap">
                   {hourStr}
                 </td>
                 {DAYS.map(({ value }) => {
                   if (filterDia && filterDia !== value) return null;
                   const cellItems = gridMap.get(value)?.get(hourInt) ?? [];
                   return (
-                    <td key={value} className="px-1 py-1 border-r border-gray-100 align-top min-h-[36px]">
+                    <td key={value} className="px-0.5 sm:px-1 py-0.5 sm:py-1 border-r border-gray-100 align-top min-h-[28px] sm:min-h-[36px]">
                       {cellItems.map((h, idx) => (
                         <div
                           key={`${h.id}-${idx}`}
                           onClick={() => setDetailId(h.id)}
-                          className={`rounded border px-1.5 py-1 mb-0.5 leading-tight cursor-pointer hover:brightness-95 transition-all ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 border-gray-200 text-gray-700'}`}
+                          className={`rounded border px-1 sm:px-1.5 py-0.5 sm:py-1 mb-0.5 leading-tight cursor-pointer hover:brightness-95 transition-all text-[10px] sm:text-xs ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 border-gray-200 text-gray-700'}`}
                           title={`${h.asignacion?.materia?.nombre ?? ''} · ${h.asignacion?.grupo?.nombre ?? ''} · ${h.aula?.nombre ?? ''}`}
                         >
-                          <div className="font-semibold truncate max-w-[120px]">
+                          <div className="font-semibold truncate max-w-[90px] sm:max-w-[120px]">
                             {h.asignacion?.materia?.nombre ?? 'Sin materia'}
                           </div>
-                          <div className="text-[10px] opacity-75 truncate max-w-[120px]">
+                          <div className="text-[9px] sm:text-[10px] opacity-75 truncate max-w-[90px] sm:max-w-[120px]">
                             {h.asignacion?.grupo?.codigo_grupo} · {h.aula?.codigo_aula ?? '—'}
                           </div>
                           {h.asignacion?.docente?.user && (
-                            <div className="text-[10px] opacity-60 truncate max-w-[120px]">
+                            <div className="text-[8px] sm:text-[10px] opacity-60 truncate max-w-[90px] sm:max-w-[120px]">
                               {h.asignacion.docente.user.nombre} {h.asignacion.docente.user.apellido.charAt(0)}.
                             </div>
                           )}
@@ -305,40 +306,40 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
 
   /* ── UI ─────────────────────────────────────────────────────────── */
   return (
-    <div className="p-6 h-full overflow-auto">
+    <div className="p-4 sm:p-6 h-full overflow-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <Calendar className="text-blue-600" size={26} />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Horarios</h1>
-            <p className="text-gray-500 text-sm">{horarios.length} sesiones registradas</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3 mb-4 sm:mb-5">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Calendar className="text-blue-600 shrink-0" size={24} />
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Horarios</h1>
+            <p className="text-gray-500 text-xs sm:text-sm">{horarios.length} sesiones registradas</p>
           </div>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap sm:flex-nowrap">
           <button onClick={fetchHorarios}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition" title="Actualizar">
-            <RefreshCw size={15} className={loading ? 'animate-spin text-blue-500' : 'text-gray-500'} />
+            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition shrink-0" title="Actualizar">
+            <RefreshCw size={14} className={`${loading ? 'animate-spin text-blue-500' : 'text-gray-500'} w-4 h-4 sm:w-5 sm:h-5`} />
           </button>
           <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition text-gray-600 font-medium">
-            {viewMode === 'grid' ? '☰ Lista' : '⊞ Cuadrícula'}
+            className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm hover:bg-gray-50 transition text-gray-600 font-medium">
+            {viewMode === 'grid' ? '☰ Lista' : '⊞ Cuad.'}
           </button>
           <button onClick={onAssignClick}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-sm">
-            <Plus size={15} /> Nuevo horario
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-xs sm:text-sm">
+            <Plus size={14} /> <span className="hidden sm:inline">Nuevo horario</span><span className="sm:hidden">+</span>
           </button>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-5 flex-wrap">
+      <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-5 flex-wrap">
         <div className="flex items-center gap-2">
-          <Filter size={14} className="text-gray-400" />
+          <Filter size={14} className="text-gray-400 shrink-0" />
           <select
             value={filterDia}
             onChange={(e) => setFilterDia(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todos los días</option>
             {DAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
@@ -348,14 +349,14 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
           type="text"
           value={cicloInput}
           onChange={(e) => setCicloInput(e.target.value)}
-          placeholder="Ciclo escolar (p.ej. 2026-1)"
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+          placeholder="Ciclo (p.ej. 2026-1)"
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:flex-none sm:w-48 min-w-0"
         />
       </div>
 
       {/* Error */}
       {error && !loading && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">{error}</div>
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm mb-4">{error}</div>
       )}
 
       {/* Loading */}
