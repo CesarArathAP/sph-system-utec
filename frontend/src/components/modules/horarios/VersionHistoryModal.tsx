@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { History, ChevronDown, ChevronUp, ArrowRight, RotateCcw, Eye } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, ArrowRight, RotateCcw, Eye, X } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { API_CONFIG } from '../../../services/config';
 
 interface Version {
@@ -156,21 +157,23 @@ export default function HorarioVersionHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <History size={24} />
-            <h2 className="text-xl font-bold">Histórico de Versiones - Horario #{horarioId}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:bg-blue-700 p-2 rounded-full transition"
-          >
-            ✕
-          </button>
-        </div>
+    <Dialog.Root open={isOpen} onOpenChange={onClose}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/30 z-40" />
+        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History size={24} />
+                <h2 className="text-xl font-bold">Histórico de Versiones - Horario #{horarioId}</h2>
+              </div>
+              <Dialog.Close asChild>
+                <button className="text-white hover:bg-blue-700 p-2 rounded-full transition">
+                  <X size={20} />
+                </button>
+              </Dialog.Close>
+            </div>
 
         {/* Content */}
         <div className="overflow-y-auto flex-1 p-6">
@@ -347,7 +350,9 @@ export default function HorarioVersionHistoryModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
