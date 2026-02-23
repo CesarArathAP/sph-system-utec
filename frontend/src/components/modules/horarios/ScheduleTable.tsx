@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus, Eye } from 'lucide-react';
+import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus, Eye, History } from 'lucide-react';
 import { API_CONFIG } from '../../../services/config';
 import HorarioDetailModal from './HorarioDetailModal';
+import VersionHistoryModal from './VersionHistoryModal';
 
 /* ── Tipos ─────────────────────────────────────────────────────────── */
 interface HorarioResponse {
@@ -91,6 +92,9 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [cicloInput, setCicloInput] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [versionHistoryHorarioId, setVersionHistoryHorarioId] = useState<number | null>(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [horarioVersiones, setHorarioVersiones] = useState<Record<number, { version: number; cambios: string }>>({}); // horario_id -> {version, cambios}
 
   /* ── Fetch horarios ───────────────────────────────────────────────── */
   const fetchHorarios = useCallback(async () => {
@@ -104,6 +108,58 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setHorarios(data.horarios ?? []);
+      
+      // Obtener versiones de cada horario
+      if (data.horarios && data.horarios.length > 0) {
+        const versiones: Record<number, { version: number; cambios: string }> = {};
+        for (const h of data.horarios) {
+          try {
+            const versionRes = await fetch(`${BASE}/horarios/${h.id}/versiones?page=1&page_size=100`, {
+              headers: { Authorization: `Bearer ${getToken()}` },
+            });
+            if (versionRes.ok) {
+              const versionData = await versionRes.json();
+              const allVersions = versionData.versiones || [];
+              if (allVersions.length > 0) {
+                const maxVersion = Math.max(...allVersions.map((v: any) => v.version_numero));
+                // Obtener la última versión para mostrar el cambio
+                const lastVersion = allVersions.find((v: any) => v.version_numero === maxVersion);
+                
+                let cambioTexto = '';
+                if (lastVersion && lastVersion.estado_anterior) {
+                  // Extraer cambios específicos
+                  const cambios = [];
+                  const oldState = lastVersion.estado_anterior;
+                  const newState = lastVersion.estado_nuevo;
+                  
+                  // Verificar cambios comunes
+                  if (oldState.hora_inicio !== newState.hora_inicio || oldState.hora_fin !== newState.hora_fin) {
+                    cambios.push(`Hora: ${oldState.hora_inicio}-${oldState.hora_fin} → ${newState.hora_inicio}-${newState.hora_fin}`);
+                  }
+                  if (oldState.aula_id !== newState.aula_id) {
+                    cambios.push(`Aula: ${oldState.aula_id} → ${newState.aula_id}`);
+                  }
+                  if (oldState.dia_semana !== newState.dia_semana) {
+                    cambios.push(`Día: ${oldState.dia_semana} → ${newState.dia_semana}`);
+                  }
+                  if (oldState.tipo_sesion !== newState.tipo_sesion) {
+                    cambios.push(`Tipo: ${oldState.tipo_sesion} → ${newState.tipo_sesion}`);
+                  }
+                  
+                  cambioTexto = cambios.length > 0 ? cambios.join(' | ') : 'Modificado';
+                } else {
+                  cambioTexto = 'Creado';
+                }
+                
+                versiones[h.id] = { version: maxVersion, cambios: cambioTexto };
+              }
+            }
+          } catch {
+            // Ignorar errores de versiones individuales
+          }
+        }
+        setHorarioVersiones(versiones);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -198,12 +254,14 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
             <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600 hidden lg:table-cell">Docente</th>
             <th className="text-left px-2 sm:px-4 py-3 font-semibold text-gray-600">Aula</th>
             <th className="text-center px-2 sm:px-4 py-3 font-semibold text-gray-600">Tipo</th>
+            <th className="text-center px-2 sm:px-4 py-3 font-semibold text-gray-600">Versión</th>
+            <th className="text-center px-2 sm:px-4 py-3 font-semibold text-gray-600">Acciones</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {horarios.length === 0 ? (
             <tr>
-              <td colSpan={7} className="text-center py-8 sm:py-12 text-gray-400 px-4">No hay horarios registrados</td>
+              <td colSpan={9} className="text-center py-8 sm:py-12 text-gray-400 px-4">No hay horarios registrados</td>
             </tr>
           ) : (
             [...horarios].sort((a, b) => {
@@ -234,6 +292,34 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
                   <span className={`text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border whitespace-nowrap inline-block ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                     {TIPO_LABEL[h.tipo_sesion] ?? h.tipo_sesion}
                   </span>
+                </td>
+                <td className="px-2 sm:px-4 py-3 text-center">
+                  {horarioVersiones[h.id] ? (
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center justify-center w-6 h-6 bg-purple-100 text-purple-700 rounded-full text-xs font-bold border border-purple-300">
+                        v{horarioVersiones[h.id].version}
+                      </div>
+                      <p className="text-xs text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs" title={horarioVersiones[h.id].cambios}>
+                        {horarioVersiones[h.id].cambios}
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="px-2 sm:px-4 py-3 text-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setVersionHistoryHorarioId(h.id);
+                      setShowVersionHistory(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition text-xs font-semibold"
+                    title="Ver histórico de cambios"
+                  >
+                    <History size={16} />
+                    Ver
+                  </button>
                 </td>
               </tr>
             ))
@@ -491,6 +577,13 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
         horarioId={detailId}
         onClose={() => setDetailId(null)}
         onSaved={() => { setDetailId(null); fetchHorarios(); }}
+      />
+
+      {/* Modal de histórico de versiones */}
+      <VersionHistoryModal
+        horarioId={versionHistoryHorarioId || 0}
+        isOpen={showVersionHistory}
+        onClose={() => setShowVersionHistory(false)}
       />
 
     </div>
