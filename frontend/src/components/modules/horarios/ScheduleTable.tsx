@@ -90,11 +90,14 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [error, setError] = useState<string | null>(null);
   const [filterDia, setFilterDia] = useState<string>('');
   const [cicloInput, setCicloInput] = useState('');
+  const [filterDocente, setFilterDocente] = useState('');
+  const [filterAula, setFilterAula] = useState('');
+  const [filterGrupo, setFilterGrupo] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [versionHistoryHorarioId, setVersionHistoryHorarioId] = useState<number | null>(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [horarioVersiones, setHorarioVersiones] = useState<Record<number, { version: number; cambios: string }>>({}); // horario_id -> {version, cambios}
+  const [horarioVersiones, setHorarioVersiones] = useState<Record<number, { version: number; cambios: string }>>({}); // horario_id -> {version, cambios} // horario_id -> {version, cambios}
 
   /* ── Fetch horarios ───────────────────────────────────────────────── */
   const fetchHorarios = useCallback(async () => {
@@ -225,11 +228,52 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
   useEffect(() => { fetchConflictos(); }, [fetchConflictos]);
 
+  /* ── Listas únicas para los selects de filtro ─────────────────────── */
+  const uniqueDocentes = Array.from(
+    new Map(
+      horarios
+        .filter(h => h.asignacion?.docente)
+        .map(h => {
+          const d = h.asignacion!.docente!;
+          const label = d.user ? `${d.user.nombre} ${d.user.apellido}` : d.codigo_docente;
+          return [d.codigo_docente, label];
+        })
+    ).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  const uniqueAulas = Array.from(
+    new Map(
+      horarios
+        .filter(h => h.aula)
+        .map(h => [h.aula!.codigo_aula, h.aula!.nombre])
+    ).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  const uniqueGrupos = Array.from(
+    new Map(
+      horarios
+        .filter(h => h.asignacion?.grupo)
+        .map(h => [
+          h.asignacion!.grupo!.codigo_grupo,
+          h.asignacion!.grupo!.nombre,
+        ])
+    ).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  /* ── Horarios filtrados (ciclo + docente + aula + grupo) ───────────── */
+  const horariosFiltrados = horarios.filter(h => {
+    if (cicloInput && !h.asignacion?.ciclo_escolar?.toLowerCase().includes(cicloInput.toLowerCase())) return false;
+    if (filterDocente && h.asignacion?.docente?.codigo_docente !== filterDocente) return false;
+    if (filterAula && h.aula?.codigo_aula !== filterAula) return false;
+    if (filterGrupo && h.asignacion?.grupo?.codigo_grupo !== filterGrupo) return false;
+    return true;
+  });
+
   /* ── Construir mapa del grid: dia → hora → horarios ──────────────── */
   const gridMap = new Map<string, Map<number, HorarioResponse[]>>();
   DAYS.forEach(({ value }) => gridMap.set(value, new Map()));
 
-  horarios.filter((h) => h.activo).forEach((h) => {
+  horariosFiltrados.filter((h) => h.activo).forEach((h) => {
     const dayMap = gridMap.get(h.dia_semana);
     if (!dayMap) return;
     const startH = timeToHour(h.hora_inicio);
@@ -259,12 +303,12 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {horarios.length === 0 ? (
+          {horariosFiltrados.length === 0 ? (
             <tr>
-              <td colSpan={9} className="text-center py-8 sm:py-12 text-gray-400 px-4">No hay horarios registrados</td>
+              <td colSpan={9} className="text-center py-8 sm:py-12 text-gray-400 px-4">No hay horarios que coincidan con los filtros</td>
             </tr>
           ) : (
-            [...horarios].sort((a, b) => {
+            [...horariosFiltrados].sort((a, b) => {
               const di = DAYS.findIndex(d => d.value === a.dia_semana) - DAYS.findIndex(d => d.value === b.dia_semana);
               return di !== 0 ? di : a.hora_inicio.localeCompare(b.hora_inicio);
             }).map((h) => (
@@ -419,25 +463,80 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-5 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-gray-400 shrink-0" />
-          <select
-            value={filterDia}
-            onChange={(e) => setFilterDia(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Todos los días</option>
-            {DAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-          </select>
-        </div>
+      <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-5 flex-wrap items-center">
+        {/* Icono filtro */}
+        <Filter size={14} className="text-gray-400 shrink-0" />
+
+        {/* Día */}
+        <select
+          value={filterDia}
+          onChange={(e) => setFilterDia(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          title="Filtrar por día"
+        >
+          <option value="">Todos los días</option>
+          {DAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+        </select>
+
+        {/* Ciclo */}
         <input
           type="text"
           value={cicloInput}
           onChange={(e) => setCicloInput(e.target.value)}
-          placeholder="Ciclo (p.ej. 2026-1)"
-          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:flex-none sm:w-48 min-w-0"
+          placeholder="Ciclo (ej. 2026-1)"
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 sm:w-40 min-w-0"
+          title="Filtrar por ciclo escolar"
         />
+
+        {/* Docente */}
+        <select
+          value={filterDocente}
+          onChange={(e) => setFilterDocente(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[160px] sm:max-w-[200px]"
+          title="Filtrar por docente"
+        >
+          <option value="">Todos los docentes</option>
+          {uniqueDocentes.map(([codigo, nombre]) => (
+            <option key={codigo} value={codigo}>{nombre}</option>
+          ))}
+        </select>
+
+        {/* Aula */}
+        <select
+          value={filterAula}
+          onChange={(e) => setFilterAula(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[140px]"
+          title="Filtrar por aula"
+        >
+          <option value="">Todas las aulas</option>
+          {uniqueAulas.map(([codigo, nombre]) => (
+            <option key={codigo} value={codigo}>{nombre}</option>
+          ))}
+        </select>
+
+        {/* Grupo */}
+        <select
+          value={filterGrupo}
+          onChange={(e) => setFilterGrupo(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[140px]"
+          title="Filtrar por grupo"
+        >
+          <option value="">Todos los grupos</option>
+          {uniqueGrupos.map(([codigo, nombre]) => (
+            <option key={codigo} value={codigo}>{nombre}</option>
+          ))}
+        </select>
+
+        {/* Botón limpiar filtros (solo si hay alguno activo) */}
+        {(filterDia || cicloInput || filterDocente || filterAula || filterGrupo) && (
+          <button
+            onClick={() => { setFilterDia(''); setCicloInput(''); setFilterDocente(''); setFilterAula(''); setFilterGrupo(''); }}
+            className="text-xs text-gray-500 hover:text-red-500 underline transition shrink-0"
+            title="Limpiar todos los filtros"
+          >
+            × Limpiar filtros
+          </button>
+        )}
       </div>
 
       {/* Error */}
