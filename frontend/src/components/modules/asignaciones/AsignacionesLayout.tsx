@@ -105,46 +105,46 @@ export default function AsignacionesLayout() {
 
     /* ── RENDER ──────────────────────────────────────────────────────────── */
     return (
-        <div className="p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <BookCopy className="text-indigo-600" size={28} />
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Asignaciones</h1>
-                        <p className="text-sm text-gray-500">{total} asignación(es) registrada(s)</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <BookCopy className="text-indigo-600 shrink-0" size={26} />
+                    <div className="min-w-0">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Asignaciones</h1>
+                        <p className="text-xs sm:text-sm text-gray-500">{total} asignación(es)</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={fetchAsignaciones}
-                        className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition" title="Recargar">
-                        <RefreshCw size={15} className={loading ? 'animate-spin text-indigo-500' : 'text-gray-500'} />
+                        className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition shrink-0" title="Recargar">
+                        <RefreshCw size={14} className={`${loading ? 'animate-spin text-indigo-500' : 'text-gray-500'} w-4 h-4 sm:w-5 sm:h-5`} />
                     </button>
                     <button
                         onClick={() => { setEditing(null); setModalOpen(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-sm transition"
+                        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-xs sm:text-sm transition"
                     >
-                        <Plus size={15} /> Nueva asignación
+                        <Plus size={14} /> <span className="hidden sm:inline">Nueva</span>
                     </button>
                 </div>
             </div>
 
             {/* Filtros */}
-            <div className="flex flex-wrap gap-3">
-                <div className="relative flex-1 min-w-52">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+                <div className="relative flex-1 min-w-0 sm:min-w-52">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
                     <input
                         type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar por materia, grupo, docente…"
-                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Buscar materia, grupo, docente…"
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                 </div>
-                <div className="relative">
+                <div className="relative w-full sm:w-44">
                     <input
                         type="text" value={filterCiclo} onChange={(e) => { setFilterCiclo(e.target.value); setPage(1); }}
-                        placeholder="Filtrar ciclo (ej: 2026-1)"
-                        className="w-44 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Filtrar ciclo (2026-1)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                 </div>
             </div>
@@ -155,16 +155,16 @@ export default function AsignacionesLayout() {
             )}
 
             {/* Tabla */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+            <div className="bg-white rounded-lg sm:rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+                <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
+                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                         <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600 w-8">#</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Materia</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Grupo</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Docente</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600 w-24">Ciclo</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-600 w-24">Acciones</th>
+                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">#</th>
+                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Materia</th>
+                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Grupo</th>
+                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Docente</th>
+                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Ciclo</th>
+                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -191,36 +191,36 @@ export default function AsignacionesLayout() {
                                 const deleteLabel = `${a.materia?.nombre ?? ''} → ${a.grupo?.nombre ?? ''}`;
                                 return (
                                     <tr key={a.id} className="hover:bg-gray-50 transition">
-                                        <td className="px-4 py-3 text-gray-400 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                                        <td className="px-4 py-3">
-                                            <p className="font-medium text-gray-800">{a.materia?.nombre ?? '—'}</p>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-400 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
+                                            <p className="font-medium text-gray-800 text-xs sm:text-sm">{a.materia?.nombre ?? '—'}</p>
                                             <p className="text-xs text-gray-400">
                                                 {a.materia?.codigo_materia} · {a.materia?.horas_semana}h/sem · {a.materia?.creditos} cr.
                                             </p>
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${semColor}`}>
                                                     S{a.grupo?.semestre}
                                                 </span>
                                                 <div>
-                                                    <p className="font-medium text-gray-800">{a.grupo?.nombre ?? '—'}</p>
+                                                    <p className="font-medium text-gray-800 text-xs sm:text-sm">{a.grupo?.nombre ?? '—'}</p>
                                                     <p className="text-xs text-gray-400">{a.grupo?.codigo_grupo} · {a.grupo?.carrera}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <p className="font-medium text-gray-800">{docLabel}</p>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
+                                            <p className="font-medium text-gray-800 text-xs sm:text-sm">{docLabel}</p>
                                             {a.docente?.user?.email && (
                                                 <p className="text-xs text-gray-400">{a.docente.user.email}</p>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
+                                            <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full whitespace-nowrap">
                                                 {a.ciclo_escolar}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
                                             <div className="flex items-center justify-center gap-1">
                                                 <button onClick={() => { setEditing(a); setModalOpen(true); }}
                                                     className="p-1.5 rounded hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 transition" title="Editar">
