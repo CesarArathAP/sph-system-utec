@@ -69,48 +69,79 @@ export default function Sidebar({ activeMenu, onLogout, isOpen = false, onClose 
   };
 
   return (
-    <aside className={`w-64 bg-blue-700 text-white h-screen fixed left-0 top-0 flex flex-col z-40 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+    <aside className={`w-64 bg-gradient-to-b from-blue-700 via-blue-700 to-blue-800 text-white h-screen fixed left-0 top-0 flex flex-col z-40 transform transition-transform duration-300 ease-in-out lg:translate-x-0 border-r border-blue-600/50 shadow-2xl ${
       isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:relative'
     }`}>
-      {/* Logo */}
-      <div className="p-4 sm:p-6 border-b border-blue-600">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">SPH System</h1>
-        <p className="text-blue-200 text-xs mt-1">Gestión de Horarios UTEC</p>
+      {/* Logo Section */}
+      <div className="p-5 sm:p-6 border-b border-blue-600/50 bg-gradient-to-r from-blue-700 to-blue-600">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+              SPH System
+            </h1>
+          </div>
+          <p className="text-blue-200 text-xs font-medium ml-4.5">
+            Gestión de Horarios UTEC
+          </p>
+        </div>
       </div>
 
-      {/* Usuario */}
+      {/* Usuario Profile Card */}
       {user && (
-        <div className="px-4 py-3 border-b border-blue-600 bg-blue-800">
+        <div className="px-4 py-4 mx-2 mt-4 rounded-xl border border-blue-500/30 bg-gradient-to-br from-blue-600/40 to-blue-700/40 backdrop-blur-sm hover:border-blue-400/50 transition-all duration-300">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-lg">
               {user.nombre.charAt(0)}{user.apellido.charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm truncate">{user.nombre} {user.apellido}</p>
-              <p className="text-blue-200 text-xs truncate">{rolLabel[user.rol] ?? user.rol}</p>
+              <p className="font-semibold text-sm truncate text-white">{user.nombre} {user.apellido}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-block px-2 py-0.5 bg-cyan-500/30 text-cyan-100 text-xs font-medium rounded-full border border-cyan-400/30">
+                  {rolLabel[user.rol] ?? user.rol}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Navegación */}
-      <nav className="flex-1 p-3 sm:p-4 overflow-y-auto">
-        <p className="text-blue-300 text-xs uppercase font-semibold mb-3 px-2 tracking-wider">
-          Menú
+      <nav className="flex-1 px-3 py-5 sm:px-4 overflow-y-auto">
+        <p className="text-blue-300 text-xs uppercase font-bold mb-4 px-3 tracking-widest opacity-70">
+          → Navegación
         </p>
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {menuItems.map(({ id, label, Icon, href }) => (
             <li key={id}>
               <a
                 href={href}
                 onClick={handleMenuClick}
-                className={`w-full text-left px-4 py-2.5 rounded-lg transition-all flex items-center gap-3 text-sm font-medium ${activeMenu === id
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-blue-100 hover:bg-blue-600'
-                  }`}
+                className={`
+                  w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-3 text-sm font-medium
+                  group relative overflow-hidden
+                  ${activeMenu === id
+                    ? 'bg-white text-blue-700 shadow-lg shadow-cyan-500/20 scale-105'
+                    : 'text-blue-100 hover:bg-blue-600/50 hover:text-white hover:translate-x-1'
+                  }
+                `}
               >
-                <Icon size={18} strokeWidth={2} className="shrink-0" />
+                {/* Fondo animado para items activos */}
+                {activeMenu === id && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-300 to-white opacity-0 group-hover:opacity-5 transition-opacity duration-300 rounded-xl"></div>
+                )}
+                
+                <Icon 
+                  size={20} 
+                  strokeWidth={2} 
+                  className={`shrink-0 transition-transform duration-200 ${activeMenu === id ? 'text-blue-600' : 'group-hover:scale-110'}`} 
+                />
                 <span className="truncate">{label}</span>
+                
+                {/* Indicador de activo */}
+                {activeMenu === id && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gradient-to-r from-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/50"></div>
+                )}
               </a>
             </li>
           ))}
@@ -118,15 +149,23 @@ export default function Sidebar({ activeMenu, onLogout, isOpen = false, onClose 
       </nav>
 
       {/* Footer */}
-      <div className="p-3 sm:p-4 border-t border-blue-600">
+      <div className="p-4 sm:p-5 border-t border-blue-600/50 bg-gradient-to-b from-transparent to-blue-800/50 space-y-4">
         {user && (
-          <p className="text-blue-300 text-xs truncate mb-3 break-words">{user.email}</p>
+          <div className="px-3 py-2 rounded-lg bg-blue-600/20 border border-blue-500/20">
+            <p className="text-blue-200 text-xs truncate break-words font-medium">{user.email}</p>
+          </div>
         )}
         <button
           onClick={handleLogout}
-          className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition text-sm flex items-center justify-center gap-2"
+          className={`
+            w-full px-4 py-2.5 rounded-lg text-white font-semibold transition-all duration-200
+            flex items-center justify-center gap-2
+            bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600
+            hover:shadow-lg hover:shadow-red-500/30 active:scale-95
+            group
+          `}
         >
-          <LogOut size={16} strokeWidth={2} className="shrink-0" />
+          <LogOut size={18} strokeWidth={2.5} className="shrink-0 group-hover:rotate-180 transition-transform duration-300" />
           <span>Cerrar sesión</span>
         </button>
       </div>
