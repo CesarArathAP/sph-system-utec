@@ -255,7 +255,7 @@ export default function ProfesoresLayout() {
 
   /* ── Render */
   return (
-    <div className="p-4 sm:p-6 md:p-8">
+    <div className="p-4 sm:p-6 md:p-8 min-h-full bg-[#081028] text-white">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <ConfirmDialog open={confirm.open} message={confirm.msg}
         onConfirm={confirmDelete} onCancel={() => setConfirm({ open: false, msg: '' })} />
@@ -269,13 +269,13 @@ export default function ProfesoresLayout() {
             <GraduationCap size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Docentes</h1>
-            <p className="text-gray-500 text-xs sm:text-sm">{total} docentes registrados</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Docentes</h1>
+            <p className="text-white/40 text-xs sm:text-sm">{total} docentes registrados</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={fetchDocentes} title="Actualizar"
-            className="p-2 rounded-xl border border-blue-200 hover:bg-blue-50 transition text-blue-600 cursor-pointer">
+            className="p-2 rounded-xl border border-white/10 hover:bg-white/10 transition text-blue-400 cursor-pointer">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
@@ -298,10 +298,10 @@ export default function ProfesoresLayout() {
           placeholder="Buscar docente, código, departamento, email..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
-                     text-sm text-gray-700 placeholder:text-gray-400
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
-                     backdrop-blur-sm transition"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5
+                     text-sm text-white placeholder:text-white/30
+                     focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent
+                     transition"
         />
       </div>
 
@@ -309,73 +309,73 @@ export default function ProfesoresLayout() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <RefreshCw size={28} className="animate-spin text-blue-500" />
-          <span className="text-gray-400 text-sm">Cargando docentes...</span>
+          <span className="text-white/30 text-sm">Cargando docentes...</span>
         </div>
       )}
 
       {/* Error */}
       {error && !loading && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200
-                        text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
-          <XCircle size={18} className="shrink-0 text-red-500" />{error}
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20
+                        text-red-400 rounded-xl px-4 py-3 text-sm mb-5">
+          <XCircle size={18} className="shrink-0 text-red-400" />{error}
         </div>
       )}
 
       {/* Tabla */}
       {!loading && !error && (
-        <div className="bg-white/80 backdrop-blur-sm border border-blue-100 rounded-2xl shadow-sm overflow-x-auto">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-x-auto">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
-              <tr className="bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] text-white">
-                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap first:rounded-tl-2xl text-xs tracking-wide">Código</th>
-                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Nombre</th>
-                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Email</th>
-                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Departamento</th>
-                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Hrs/Sem</th>
-                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Disponibilidad</th>
-                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Estado</th>
-                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap last:rounded-tr-2xl text-xs tracking-wide">Acciones</th>
+              <tr className="bg-white/[0.03] border-b border-white/10">
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Código</th>
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Nombre</th>
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Email</th>
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Departamento</th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Hrs/Sem</th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Disponibilidad</th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Estado</th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-blue-50">
+            <tbody className="divide-y divide-white/5">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-14 text-gray-400 text-sm">
+                  <td colSpan={8} className="text-center py-14 text-white/30 text-sm">
                     {searchTerm ? 'Sin resultados para la búsqueda' : 'No hay docentes registrados'}
                   </td>
                 </tr>
               ) : (
                 filtered.map((docente) => (
-                  <tr key={docente.id} className="hover:bg-blue-50/50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-semibold text-blue-700 text-xs">{docente.codigo_docente}</td>
+                  <tr key={docente.id} className="hover:bg-white/[0.03] transition-colors">
+                    <td className="px-4 py-3 font-mono font-semibold text-blue-400 text-xs">{docente.codigo_docente}</td>
 
                     <td className="px-4 py-3">
                       {docente.user ? (
                         <button
                           onClick={() => { setSelectedDocente(docente); setIsHorarioOpen(true); }}
-                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition text-sm"
+                          className="font-medium text-blue-400 hover:text-blue-300 hover:underline text-left transition text-sm"
                           title="Ver horario del docente">
                           {docente.user.nombre} {docente.user.apellido}
                         </button>
                       ) : (
-                        <span className="text-gray-400 italic text-sm">Sin usuario vinculado</span>
+                        <span className="text-white/25 italic text-sm">Sin usuario vinculado</span>
                       )}
                     </td>
 
-                    <td className="px-4 py-3 text-gray-600 text-xs">{docente.user?.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-white/50 text-xs">{docente.user?.email ?? '—'}</td>
 
-                    <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate text-sm" title={docente.departamento ?? ''}>
-                      {docente.departamento ?? <span className="text-gray-400">—</span>}
+                    <td className="px-4 py-3 text-white/70 max-w-[160px] truncate text-sm" title={docente.departamento ?? ''}>
+                      {docente.departamento ?? <span className="text-white/25">—</span>}
                     </td>
 
-                    <td className="px-4 py-3 text-center text-gray-700 text-sm">{docente.horas_maximas_semana}h</td>
+                    <td className="px-4 py-3 text-center text-white/70 text-sm">{docente.horas_maximas_semana}h</td>
 
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => { setSelectedDocente(docente); setIsDisponibilidadOpen(true); }}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                                   bg-indigo-100 text-indigo-700 border border-indigo-200
-                                   hover:bg-indigo-200 transition cursor-pointer whitespace-nowrap"
+                                   bg-indigo-500/20 text-indigo-300 border border-indigo-500/20
+                                   hover:bg-indigo-500/30 transition cursor-pointer whitespace-nowrap"
                         title="Ver disponibilidad">
                         <CalendarDays size={11} />
                         {docente.disponibilidades?.length ?? 0} bloques
@@ -385,8 +385,8 @@ export default function ProfesoresLayout() {
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
                         ${docente.activo
-                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                          : 'bg-red-100   text-red-700   border border-red-200'}`}>
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-red-500/20   text-red-400   border border-red-500/20'}`}>
                         {docente.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
@@ -395,20 +395,20 @@ export default function ProfesoresLayout() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => { setSelectedDocente(docente); setIsModalOpen(true); }}
-                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 transition cursor-pointer"
                           title="Editar docente">
                           <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => handleToggleActivo(docente)}
                           className={`p-1.5 rounded-lg transition cursor-pointer
-                            ${docente.activo ? 'hover:bg-amber-100 text-amber-500' : 'hover:bg-emerald-100 text-emerald-600'}`}
+                            ${docente.activo ? 'hover:bg-amber-500/20 text-amber-400' : 'hover:bg-emerald-500/20 text-emerald-400'}`}
                           title={docente.activo ? 'Suspender' : 'Activar'}>
                           {docente.activo ? <PowerOff size={14} /> : <Power size={14} />}
                         </button>
                         <button
                           onClick={() => handleDelete(docente.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition cursor-pointer"
                           title="Eliminar docente">
                           <Trash2 size={14} />
                         </button>
