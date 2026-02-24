@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { GraduationCap, Search, Pencil, Trash2, RefreshCw, Plus, CalendarDays, PowerOff, Power } from 'lucide-react';
+import {
+  GraduationCap, Search, Pencil, Trash2, RefreshCw, Plus,
+  CalendarDays, PowerOff, Power,
+  CheckCircle2, XCircle, AlertTriangle, Info, X,
+} from 'lucide-react';
 import ProfesoresModal from './ProfesoresModal';
 import DisponibilidadModal from './DisponibilidadModal';
 import DocenteHorarioModal from './DocenteHorarioModal';
 import { API_CONFIG } from '../../../services/config';
 
-/* ── Tipos ─────────────────────────────────────────────────────────── */
+/* ─── Tipos ─────────────────────────────────────────────────── */
 export interface Disponibilidad {
   id: number;
   docente_id: number;
@@ -26,7 +30,7 @@ export interface UserInfo {
 export interface Docente {
   id?: number;
   user_id: number;
-  user?: UserInfo;              // datos del user vinculado (Opción A)
+  user?: UserInfo;
   codigo_docente: string;
   departamento: string | null;
   horas_maximas_semana: number;
@@ -36,29 +40,107 @@ export interface Docente {
   updated_at?: string;
 }
 
-/* ── Helpers ────────────────────────────────────────────────────────── */
-function getToken() {
-  return localStorage.getItem('auth_token') ?? '';
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+interface Toast { id: number; type: ToastType; title: string; message: string; }
+
+/* ─── Toast ─────────────────────────────────────────────────── */
+const toastAccent: Record<ToastType, string> = {
+  success: 'bg-green-500', error: 'bg-red-500',
+  warning: 'bg-amber-500', info:  'bg-blue-500',
+};
+const toastIconColor: Record<ToastType, string> = {
+  success: 'text-green-400', error:   'text-red-400',
+  warning: 'text-amber-400', info:    'text-blue-400',
+};
+const toastIconEl: Record<ToastType, React.ReactNode> = {
+  success: <CheckCircle2  size={18} />,
+  error:   <XCircle       size={18} />,
+  warning: <AlertTriangle size={18} />,
+  info:    <Info          size={18} />,
+};
+
+function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+  return (
+    <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-3 w-[320px] pointer-events-none">
+      {toasts.map((t) => (
+        <div key={t.id}
+          className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto bg-slate-900 border border-slate-700">
+          <div className={`w-1 shrink-0 ${toastAccent[t.type]}`} />
+          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>{toastIconEl[t.type]}</div>
+          <div className="flex-1 py-3 pr-2 min-w-0">
+            <p className="text-white text-sm font-semibold leading-tight">{t.title}</p>
+            {t.message && <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>}
+          </div>
+          <button onClick={() => onRemove(t.id)}
+            className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start">
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
+/* ─── Confirm Dialog ────────────────────────────────────────── */
+function ConfirmDialog({ open, message, onConfirm, onCancel }:
+  { open: boolean; message: string; onConfirm: () => void; onCancel: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 border border-gray-200">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-100 shrink-0">
+            <Trash2 size={20} className="text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-gray-900 font-bold text-base leading-tight">Eliminar registro</h3>
+            <p className="text-gray-500 text-sm mt-1 leading-snug">{message}</p>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
+          <button onClick={onCancel}
+            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium transition cursor-pointer">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition cursor-pointer shadow-[0_2px_8px_rgba(220,38,38,0.35)]">
+            Sí, eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Helpers ───────────────────────────────────────────────── */
+function getToken() { return localStorage.getItem('auth_token') ?? ''; }
 const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
 
-/* ── Componente principal ───────────────────────────────────────────── */
+/* ─── Componente principal ──────────────────────────────────── */
 export default function ProfesoresLayout() {
-  const [docentes, setDocentes] = useState<Docente[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [docentes, setDocentes]               = useState<Docente[]>([]);
+  const [total, setTotal]                     = useState(0);
+  const [loading, setLoading]                 = useState(true);
+  const [error, setError]                     = useState<string | null>(null);
+  const [searchTerm, setSearchTerm]           = useState('');
+  const [isModalOpen, setIsModalOpen]         = useState(false);
   const [isDisponibilidadOpen, setIsDisponibilidadOpen] = useState(false);
-  const [isHorarioOpen, setIsHorarioOpen] = useState(false);
+  const [isHorarioOpen, setIsHorarioOpen]     = useState(false);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
+  const [toasts, setToasts]                   = useState<Toast[]>([]);
+  const [confirm, setConfirm]                 = useState<{ open: boolean; id?: number; msg: string }>({ open: false, msg: '' });
 
-  /* ── Fetch ─────────────────────────────────────────────────────── */
+  const addToast = (type: ToastType, title: string, message = '') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  /* ── Fetch */
   const fetchDocentes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await fetch(`${BASE}?page=1&page_size=100`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -69,77 +151,83 @@ export default function ProfesoresLayout() {
       setTotal(data.total ?? 0);
     } catch (e: any) {
       setError(e.message ?? 'Error al cargar docentes');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchDocentes(); }, [fetchDocentes]);
 
-  /* ── Guardar (crear / actualizar) ─────────────────────────────── */
+  /* ── Guardar */
   const handleSave = async (docente: Docente) => {
+    const isNew = !selectedDocente?.id;
     try {
-      const isEditing = !!selectedDocente?.id;
-      const method = isEditing ? 'PUT' : 'POST';
-      const url = isEditing ? `${BASE}/${selectedDocente!.id}` : BASE;
-
-      const body = isEditing
-        ? {
-          codigo_docente: docente.codigo_docente,
-          departamento: docente.departamento,
-          horas_maximas_semana: docente.horas_maximas_semana,
-          activo: docente.activo,
-        }
-        : {
-          user_id: docente.user_id,
-          codigo_docente: docente.codigo_docente,
-          departamento: docente.departamento,
-          horas_maximas_semana: docente.horas_maximas_semana,
-          disponibilidades: [],
-        };
+      const method = isNew ? 'POST' : 'PUT';
+      const url    = isNew ? BASE : `${BASE}/${selectedDocente!.id}`;
+      const body   = isNew
+        ? { user_id: docente.user_id, codigo_docente: docente.codigo_docente,
+            departamento: docente.departamento, horas_maximas_semana: docente.horas_maximas_semana, disponibilidades: [] }
+        : { codigo_docente: docente.codigo_docente, departamento: docente.departamento,
+            horas_maximas_semana: docente.horas_maximas_semana, activo: docente.activo };
 
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(body),
       });
-
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail ?? `Error ${res.status}`);
       }
       setIsModalOpen(false);
       await fetchDocentes();
+      const nombre = docente.user
+        ? `${docente.user.nombre} ${docente.user.apellido}`
+        : docente.codigo_docente;
+      addToast('success',
+        isNew ? 'Docente registrado' : 'Docente actualizado',
+        isNew ? `"${nombre}" fue registrado exitosamente` : `"${nombre}" fue actualizado`
+      );
     } catch (e: any) {
-      alert(`No se pudo guardar: ${e.message}`);
+      addToast('error', 'No se pudo guardar', e.message);
     }
   };
 
-  /* ── Toggle activo ─────────────────────────────────────────────── */
+  /* ── Toggle activo */
   const handleToggleActivo = async (docente: Docente) => {
     if (!docente.id) return;
     try {
       const res = await fetch(`${BASE}/${docente.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ activo: !docente.activo }),
       });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       await fetchDocentes();
+      const nombre = docente.user
+        ? `${docente.user.nombre} ${docente.user.apellido}`
+        : docente.codigo_docente;
+      addToast(
+        docente.activo ? 'warning' : 'success',
+        docente.activo ? 'Docente suspendido' : 'Docente activado',
+        `"${nombre}" fue ${docente.activo ? 'suspendido' : 'activado'}`
+      );
     } catch (e: any) {
-      alert(`No se pudo cambiar el estado: ${e.message}`);
+      addToast('error', 'No se pudo cambiar el estado', e.message);
     }
   };
 
-  /* ── Eliminar ──────────────────────────────────────────────────── */
-  const handleDelete = async (id: number | undefined) => {
-    if (!id || !confirm('¿Eliminar este docente? Esta acción no se puede deshacer.')) return;
+  /* ── Eliminar */
+  const handleDelete = (id: number | undefined) => {
+    if (!id) return;
+    const d = docentes.find(x => x.id === id);
+    const nombre = d?.user ? `${d.user.nombre} ${d.user.apellido}` : d?.codigo_docente ?? String(id);
+    setConfirm({ open: true, id, msg: `¿Deseas eliminar permanentemente al docente "${nombre}"?` });
+  };
+  const confirmDelete = async () => {
+    const id = confirm.id;
+    setConfirm({ open: false, msg: '' });
+    if (!id) return;
+    const d = docentes.find(x => x.id === id);
+    const nombre = d?.user ? `${d.user.nombre} ${d.user.apellido}` : d?.codigo_docente ?? String(id);
     try {
       const res = await fetch(`${BASE}/${id}`, {
         method: 'DELETE',
@@ -147,12 +235,13 @@ export default function ProfesoresLayout() {
       });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       await fetchDocentes();
+      addToast('info', 'Docente eliminado', `"${nombre}" fue eliminado`);
     } catch (e: any) {
-      alert(`No se pudo eliminar: ${e.message}`);
+      addToast('error', 'No se pudo eliminar', e.message);
     }
   };
 
-  /* ── Filtro local ──────────────────────────────────────────────── */
+  /* ── Filtro */
   const filtered = docentes.filter((d) => {
     const term = searchTerm.toLowerCase();
     const nombre = `${d.user?.nombre ?? ''} ${d.user?.apellido ?? ''}`.toLowerCase();
@@ -164,162 +253,163 @@ export default function ProfesoresLayout() {
     );
   });
 
-  /* ── UI ────────────────────────────────────────────────────────── */
+  /* ── Render */
   return (
     <div className="p-4 sm:p-6 md:p-8">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ConfirmDialog open={confirm.open} message={confirm.msg}
+        onConfirm={confirmDelete} onCancel={() => setConfirm({ open: false, msg: '' })} />
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3 mb-4 sm:mb-6">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <GraduationCap className="text-blue-600 shrink-0" size={26} />
-          <div className="min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl
+                          bg-[linear-gradient(145deg,#1e56d9,#0d3ab0)]
+                          shadow-[0_4px_16px_rgba(15,63,196,0.45)]">
+            <GraduationCap size={20} className="text-white" />
+          </div>
+          <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Docentes</h1>
             <p className="text-gray-500 text-xs sm:text-sm">{total} docentes registrados</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={fetchDocentes}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition shrink-0"
-            title="Actualizar lista"
-          >
-            <RefreshCw size={14} className={`${loading ? 'animate-spin text-blue-500' : 'text-gray-500'} w-4 h-4 sm:w-5 sm:h-5`} />
+          <button onClick={fetchDocentes} title="Actualizar"
+            className="p-2 rounded-xl border border-blue-200 hover:bg-blue-50 transition text-blue-600 cursor-pointer">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
             onClick={() => { setSelectedDocente(null); setIsModalOpen(true); }}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-xs sm:text-sm"
-          >
-            <Plus size={14} />
-            <span className="hidden sm:inline">Nuevo docente</span><span className="sm:hidden">+</span>
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm text-white cursor-pointer
+                       bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)]
+                       hover:shadow-[0_4px_16px_rgba(15,63,196,0.45)]
+                       hover:-translate-y-px transition-all duration-200">
+            <Plus size={16} />
+            <span className="hidden sm:inline">Nuevo docente</span>
           </button>
         </div>
       </div>
 
       {/* Buscador */}
-      <div className="relative mb-4 sm:mb-5">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
+      <div className="relative mb-5">
+        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-400" />
         <input
           type="text"
-          placeholder="Buscar docente, código, dept, email..."
+          placeholder="Buscar docente, código, departamento, email..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={e => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
+                     text-sm text-gray-700 placeholder:text-gray-400
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
+                     backdrop-blur-sm transition"
         />
       </div>
 
-      {/* Estado carga / error */}
+      {/* Loading */}
       {loading && (
-        <div className="flex justify-center py-12 sm:py-16">
-          <RefreshCw size={24} className="animate-spin text-blue-500" />
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <RefreshCw size={28} className="animate-spin text-blue-500" />
+          <span className="text-gray-400 text-sm">Cargando docentes...</span>
         </div>
       )}
+
+      {/* Error */}
       {error && !loading && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm mb-4">
-          {error}
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200
+                        text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
+          <XCircle size={18} className="shrink-0 text-red-500" />{error}
         </div>
       )}
 
       {/* Tabla */}
       {!loading && !error && (
-        <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
-            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-              <tr>
-                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Código</th>
-                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Nombre</th>
-                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Email</th>
-                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Departamento</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Hrs/semana</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Disponibilidad</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Estado</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Acciones</th>
+        <div className="bg-white/80 backdrop-blur-sm border border-blue-100 rounded-2xl shadow-sm overflow-x-auto">
+          <table className="w-full text-sm border-collapse min-w-max">
+            <thead>
+              <tr className="bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] text-white">
+                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap first:rounded-tl-2xl text-xs tracking-wide">Código</th>
+                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Nombre</th>
+                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Email</th>
+                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Departamento</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Hrs/Sem</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Disponibilidad</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Estado</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap last:rounded-tr-2xl text-xs tracking-wide">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-blue-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-gray-400">
+                  <td colSpan={8} className="text-center py-14 text-gray-400 text-sm">
                     {searchTerm ? 'Sin resultados para la búsqueda' : 'No hay docentes registrados'}
                   </td>
                 </tr>
               ) : (
                 filtered.map((docente) => (
-                  <tr key={docente.id} className="hover:bg-gray-50 transition">
-                    {/* Código */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 font-mono font-semibold text-gray-800 text-xs sm:text-sm">
-                      {docente.codigo_docente}
-                    </td>
+                  <tr key={docente.id} className="hover:bg-blue-50/50 transition-colors">
+                    <td className="px-4 py-3 font-mono font-semibold text-blue-700 text-xs">{docente.codigo_docente}</td>
 
-                    {/* Nombre completo */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3">
+                    <td className="px-4 py-3">
                       {docente.user ? (
                         <button
                           onClick={() => { setSelectedDocente(docente); setIsHorarioOpen(true); }}
-                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition text-xs sm:text-sm"
-                          title="Ver horario del docente"
-                        >
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left transition text-sm"
+                          title="Ver horario del docente">
                           {docente.user.nombre} {docente.user.apellido}
                         </button>
                       ) : (
-                        <span className="text-gray-400 italic text-xs sm:text-sm">Sin usuario vinculado</span>
+                        <span className="text-gray-400 italic text-sm">Sin usuario vinculado</span>
                       )}
                     </td>
 
-                    {/* Email */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 text-xs">
-                      {docente.user?.email ?? <span className="text-gray-400">—</span>}
-                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{docente.user?.email ?? '—'}</td>
 
-                    {/* Departamento */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-700 max-w-xs truncate text-xs sm:text-sm" title={docente.departamento ?? ''}>
+                    <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate text-sm" title={docente.departamento ?? ''}>
                       {docente.departamento ?? <span className="text-gray-400">—</span>}
                     </td>
 
-                    {/* Horas máximas */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-700 text-xs sm:text-sm">
-                      {docente.horas_maximas_semana}h
-                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700 text-sm">{docente.horas_maximas_semana}h</td>
 
-                    {/* Disponibilidades */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                    <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => { setSelectedDocente(docente); setIsDisponibilidadOpen(true); }}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition whitespace-nowrap"
-                        title="Ver disponibilidad"
-                      >
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
+                                   bg-indigo-100 text-indigo-700 border border-indigo-200
+                                   hover:bg-indigo-200 transition cursor-pointer whitespace-nowrap"
+                        title="Ver disponibilidad">
                         <CalendarDays size={11} />
                         {docente.disponibilidades?.length ?? 0} bloques
                       </button>
                     </td>
 
-                    {/* Estado */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold inline-block ${docente.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
+                        ${docente.activo
+                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                          : 'bg-red-100   text-red-700   border border-red-200'}`}>
                         {docente.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
 
-                    {/* Acciones */}
-                    <td className="px-2 sm:px-4 py-2 sm:py-3">
+                    <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => { setSelectedDocente(docente); setIsModalOpen(true); }}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition"
-                          title="Editar docente"
-                        >
+                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition cursor-pointer"
+                          title="Editar docente">
                           <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => handleToggleActivo(docente)}
-                          className={`p-1.5 rounded-lg transition ${docente.activo ? 'hover:bg-orange-50 text-orange-500' : 'hover:bg-green-50 text-green-600'}`}
-                          title={docente.activo ? 'Suspender' : 'Activar'}
-                        >
+                          className={`p-1.5 rounded-lg transition cursor-pointer
+                            ${docente.activo ? 'hover:bg-amber-100 text-amber-500' : 'hover:bg-emerald-100 text-emerald-600'}`}
+                          title={docente.activo ? 'Suspender' : 'Activar'}>
                           {docente.activo ? <PowerOff size={14} /> : <Power size={14} />}
                         </button>
                         <button
                           onClick={() => handleDelete(docente.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition"
-                          title="Eliminar docente"
-                        >
+                          className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition cursor-pointer"
+                          title="Eliminar docente">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -332,23 +422,19 @@ export default function ProfesoresLayout() {
         </div>
       )}
 
-      {/* Modal crear / editar */}
+      {/* Modales */}
       <ProfesoresModal
         isOpen={isModalOpen}
         docente={selectedDocente}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
       />
-
-      {/* Modal disponibilidad */}
       <DisponibilidadModal
         isOpen={isDisponibilidadOpen}
         docente={selectedDocente}
         onClose={() => setIsDisponibilidadOpen(false)}
         onSaved={fetchDocentes}
       />
-
-      {/* Modal horario del docente */}
       <DocenteHorarioModal
         isOpen={isHorarioOpen}
         docente={selectedDocente}
