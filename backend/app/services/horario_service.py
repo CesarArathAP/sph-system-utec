@@ -397,6 +397,61 @@ def check_horas_maximas_docente(
         )
 
 
+def check_capacidad_aula(
+    db: Session,
+    aula_id: int,
+    asignacion_id: int,
+) -> None:
+    """
+    Verifica que el aula tenga capacidad suficiente para el grupo asignado.
+
+    Args:
+        db: Sesión de base de datos
+        aula_id: ID del aula
+        asignacion_id: ID de la asignación (contiene el grupo)
+
+    Raises:
+        HTTPException 422 si la capacidad del aula es insuficiente.
+    """
+    aula = db.query(Aula).filter(Aula.id == aula_id).first()
+    if not aula:
+        return  # Ya validado en create_horario
+
+    asignacion = db.query(Asignacion).options(
+        joinedload(Asignacion.grupo)
+    ).filter(Asignacion.id == asignacion_id).first()
+    
+    if not asignacion or not asignacion.grupo:
+        return  # Ya validado en create_horario
+
+    grupo = asignacion.grupo
+    capacidad_aula = aula.capacidad or 0
+    num_estudiantes = grupo.num_estudiantes or 0
+
+    if num_estudiantes > capacidad_aula:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "mensaje": (
+                    f"No se puede asignar el grupo '{grupo.nombre}' al aula '{aula.nombre}': "
+                    f"el grupo tiene {num_estudiantes} estudiantes pero el aula solo tiene "
+                    f"capacidad para {capacidad_aula} personas."
+                ),
+                "capacidad_aula": {
+                    "aula": aula.nombre,
+                    "capacidad": capacidad_aula,
+                    "grupo": grupo.nombre,
+                    "num_estudiantes": num_estudiantes,
+                    "diferencia": num_estudiantes - capacidad_aula,
+                    "sugerencia": (
+                        f"Seleccione un aula con capacidad mínima de {num_estudiantes} personas "
+                        f"o divida el grupo en sesiones más pequeñas."
+                    ),
+                },
+            },
+        )
+
+
 def create_horario(db: Session, horario_data: HorarioCreate, allow_conflicts: bool = True) -> Horario:
     """
     Crear un nuevo horario.
@@ -437,6 +492,13 @@ def create_horario(db: Session, horario_data: HorarioCreate, allow_conflicts: bo
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"El aula '{aula.nombre}' no está activa"
         )
+    
+    # Verificar capacidad del aula
+    check_capacidad_aula(
+        db=db,
+        aula_id=horario_data.aula_id,
+        asignacion_id=horario_data.asignacion_id,
+    )
     
     # Verificar disponibilidad del docente ANTES de buscar conflictos
     check_docente_disponibilidad(
@@ -556,6 +618,14 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
     dia_semana = update_data.get('dia_semana', horario.dia_semana)
     hora_inicio = update_data.get('hora_inicio', horario.hora_inicio)
     hora_fin = update_data.get('hora_fin', horario.hora_fin)
+    
+    # Verificar capacidad del aula si cambia aula o asignación
+    if any(key in update_data for key in ['aula_id', 'asignacion_id']):
+        check_capacidad_aula(
+            db=db,
+            aula_id=aula_id,
+            asignacion_id=asignacion_id,
+        )
     
     # Verificar disponibilidad del docente si cambia día u hora
     if any(key in update_data for key in ['dia_semana', 'hora_inicio', 'hora_fin', 'asignacion_id']):
