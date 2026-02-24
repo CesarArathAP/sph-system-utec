@@ -19,7 +19,7 @@ interface HorarioResponse {
     ciclo_escolar: string;
     grupo?: { nombre: string; codigo_grupo: string };
     materia?: { nombre: string; codigo_materia: string };
-    docente?: { codigo_docente: string; user?: { nombre: string; apellido: string } };
+    docente?: { codigo_docente: string; departamento?: string | null; user?: { nombre: string; apellido: string } };
   };
   aula?: { nombre: string; codigo_aula: string };
 }
@@ -93,6 +93,8 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [filterDocente, setFilterDocente] = useState('');
   const [filterAula, setFilterAula] = useState('');
   const [filterGrupo, setFilterGrupo] = useState('');
+  const [filterMateria, setFilterMateria] = useState('');
+  const [filterDepartamento, setFilterDepartamento] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [versionHistoryHorarioId, setVersionHistoryHorarioId] = useState<number | null>(null);
@@ -260,12 +262,33 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
-  /* ── Horarios filtrados (ciclo + docente + aula + grupo) ───────────── */
+  const uniqueMaterias = Array.from(
+    new Map(
+      horarios
+        .filter(h => h.asignacion?.materia)
+        .map(h => [
+          h.asignacion!.materia!.codigo_materia,
+          h.asignacion!.materia!.nombre,
+        ])
+    ).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  const uniqueDepartamentos = Array.from(
+    new Set(
+      horarios
+        .map(h => h.asignacion?.docente?.departamento)
+        .filter((d): d is string => !!d)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  /* ── Horarios filtrados (ciclo + docente + aula + grupo + materia + departamento) ── */
   const horariosFiltrados = horarios.filter(h => {
     if (cicloInput && !h.asignacion?.ciclo_escolar?.toLowerCase().includes(cicloInput.toLowerCase())) return false;
     if (filterDocente && h.asignacion?.docente?.codigo_docente !== filterDocente) return false;
     if (filterAula && h.aula?.codigo_aula !== filterAula) return false;
     if (filterGrupo && h.asignacion?.grupo?.codigo_grupo !== filterGrupo) return false;
+    if (filterMateria && h.asignacion?.materia?.codigo_materia !== filterMateria) return false;
+    if (filterDepartamento && h.asignacion?.docente?.departamento !== filterDepartamento) return false;
     return true;
   });
 
@@ -527,10 +550,44 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
           ))}
         </select>
 
+        {/* Materia */}
+        <select
+          value={filterMateria}
+          onChange={(e) => setFilterMateria(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[180px]"
+          title="Filtrar por materia"
+        >
+          <option value="">Todas las materias</option>
+          {uniqueMaterias.map(([codigo, nombre]) => (
+            <option key={codigo} value={codigo}>{nombre}</option>
+          ))}
+        </select>
+
+        {/* Departamento */}
+        <select
+          value={filterDepartamento}
+          onChange={(e) => setFilterDepartamento(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[180px]"
+          title="Filtrar por departamento"
+        >
+          <option value="">Todos los departamentos</option>
+          {uniqueDepartamentos.map((dep) => (
+            <option key={dep} value={dep}>{dep}</option>
+          ))}
+        </select>
+
         {/* Botón limpiar filtros (solo si hay alguno activo) */}
-        {(filterDia || cicloInput || filterDocente || filterAula || filterGrupo) && (
+        {(filterDia || cicloInput || filterDocente || filterAula || filterGrupo || filterMateria || filterDepartamento) && (
           <button
-            onClick={() => { setFilterDia(''); setCicloInput(''); setFilterDocente(''); setFilterAula(''); setFilterGrupo(''); }}
+            onClick={() => {
+              setFilterDia('');
+              setCicloInput('');
+              setFilterDocente('');
+              setFilterAula('');
+              setFilterGrupo('');
+              setFilterMateria('');
+              setFilterDepartamento('');
+            }}
             className="text-xs text-gray-500 hover:text-red-500 underline transition shrink-0"
             title="Limpiar todos los filtros"
           >
