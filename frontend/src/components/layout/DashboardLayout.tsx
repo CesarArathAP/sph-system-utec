@@ -25,11 +25,11 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50">
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm transition-opacity duration-200"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -45,14 +45,21 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         {/* Mobile Header */}
-        <div className="lg:hidden bg-blue-700 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20">
-          <h1 className="font-bold text-lg">SPH System</h1>
+        <div className="lg:hidden bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-lg border-b border-blue-600/50">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0"></div>
+            <h1 className="font-bold text-sm truncate">SPH System</h1>
+          </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-blue-600 rounded-lg transition"
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              sidebarOpen
+                ? 'bg-blue-600/50 text-white'
+                : 'hover:bg-blue-600/50 text-blue-100'
+            } shrink-0`}
             aria-label="Toggle menu"
           >
-            {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+            {sidebarOpen ? <X size={24} strokeWidth={2.5} /> : <Menu size={24} strokeWidth={2.5} />}
           </button>
         </div>
 
