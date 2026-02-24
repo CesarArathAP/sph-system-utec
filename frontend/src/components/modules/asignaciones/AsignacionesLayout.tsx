@@ -176,7 +176,7 @@ export default function AsignacionesLayout() {
 
   /* ── Render */
   return (
-    <div className="p-4 sm:p-6 md:p-8">
+    <div className="p-4 sm:p-6 md:p-8 min-h-full bg-[#081028] text-white">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <ConfirmDialog
         open={confirm.open}
@@ -194,13 +194,13 @@ export default function AsignacionesLayout() {
             <BookCopy size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Asignaciones</h1>
-            <p className="text-gray-500 text-xs sm:text-sm">{total} asignación(es) registradas</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Asignaciones</h1>
+            <p className="text-white/40 text-xs sm:text-sm">{total} asignación(es) registradas</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={fetchAsignaciones} title="Actualizar"
-            className="p-2 rounded-xl border border-blue-200 hover:bg-blue-50 transition text-blue-600 cursor-pointer">
+            className="p-2 rounded-xl border border-white/10 hover:bg-white/10 transition text-blue-400 cursor-pointer">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
@@ -220,54 +220,54 @@ export default function AsignacionesLayout() {
           <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-400" />
           <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             placeholder="Buscar materia, grupo, docente…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
-                       text-sm text-gray-700 placeholder:text-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
-                       backdrop-blur-sm transition" />
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5
+                       text-sm text-white placeholder:text-white/30
+                       focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent
+                       transition" />
         </div>
         <div className="w-full sm:w-48">
           <input type="text" value={filterCiclo} onChange={e => { setFilterCiclo(e.target.value); setPage(1); }}
             placeholder="Filtrar por ciclo (2026-1)"
-            className="w-full px-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
-                       text-sm text-gray-700 placeholder:text-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
-                       backdrop-blur-sm transition" />
+            className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5
+                       text-sm text-white placeholder:text-white/30
+                       focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent
+                       transition" />
         </div>
       </div>
 
       {/* Error */}
       {error && !loading && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
-          <XCircle size={18} className="shrink-0 text-red-500" />{error}
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-sm mb-5">
+          <XCircle size={18} className="shrink-0 text-red-400" />{error}
         </div>
       )}
 
       {/* Tabla */}
-      <div className="bg-white/80 backdrop-blur-sm border border-blue-100 rounded-2xl shadow-sm overflow-x-auto">
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-x-auto">
         <table className="w-full text-sm border-collapse min-w-max">
           <thead>
-            <tr className="bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] text-white">
-              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap first:rounded-tl-2xl text-xs tracking-wide">#</th>
-              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Materia</th>
-              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Grupo</th>
-              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Docente</th>
-              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Ciclo</th>
-              <th className="text-center px-4 py-3 font-semibold whitespace-nowrap last:rounded-tr-2xl text-xs tracking-wide">Acciones</th>
+            <tr className="bg-white/[0.03] border-b border-white/10">
+              <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">#</th>
+              <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Materia</th>
+              <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Grupo</th>
+              <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Docente</th>
+              <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Ciclo</th>
+              <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-blue-50">
+          <tbody className="divide-y divide-white/5">
             {loading ? (
               <tr>
                 <td colSpan={6} className="py-16 text-center">
                   <RefreshCw size={26} className="animate-spin text-blue-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400">Cargando asignaciones…</p>
+                  <p className="text-sm text-white/30">Cargando asignaciones…</p>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-16 text-center">
-                  <BookCopy size={30} className="mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm text-gray-400">
+                  <BookCopy size={30} className="mx-auto mb-2 text-white/20" />
+                  <p className="text-sm text-white/30">
                     {searchTerm ? 'Sin resultados para la búsqueda' : 'No hay asignaciones registradas'}
                   </p>
                 </td>
@@ -281,12 +281,12 @@ export default function AsignacionesLayout() {
                 const deleteLabel = `${a.materia?.nombre ?? ''} → ${a.grupo?.nombre ?? ''}`;
 
                 return (
-                  <tr key={a.id} className="hover:bg-blue-50/50 transition-colors">
-                    <td className="px-4 py-3 text-gray-400 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
+                  <tr key={a.id} className="hover:bg-white/[0.03] transition-colors">
+                    <td className="px-4 py-3 text-white/25 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
 
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-gray-800 text-sm">{a.materia?.nombre ?? '—'}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="font-semibold text-white text-sm">{a.materia?.nombre ?? '—'}</p>
+                      <p className="text-xs text-white/35 mt-0.5">
                         {a.materia?.codigo_materia} · {a.materia?.horas_semana}h/sem · {a.materia?.creditos} cr.
                       </p>
                     </td>
@@ -297,21 +297,21 @@ export default function AsignacionesLayout() {
                           S{a.grupo?.semestre}
                         </span>
                         <div>
-                          <p className="font-semibold text-gray-800 text-sm">{a.grupo?.nombre ?? '—'}</p>
-                          <p className="text-xs text-gray-400">{a.grupo?.codigo_grupo} · {a.grupo?.carrera}</p>
+                          <p className="font-semibold text-white text-sm">{a.grupo?.nombre ?? '—'}</p>
+                          <p className="text-xs text-white/35">{a.grupo?.codigo_grupo} · {a.grupo?.carrera}</p>
                         </div>
                       </div>
                     </td>
 
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-gray-800 text-sm">{docLabel}</p>
+                      <p className="font-semibold text-white text-sm">{docLabel}</p>
                       {a.docente?.user?.email && (
-                        <p className="text-xs text-gray-400">{a.docente.user.email}</p>
+                        <p className="text-xs text-white/35">{a.docente.user.email}</p>
                       )}
                     </td>
 
                     <td className="px-4 py-3">
-                      <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                      <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 px-2.5 py-1 rounded-full whitespace-nowrap">
                         {a.ciclo_escolar}
                       </span>
                     </td>
@@ -319,12 +319,12 @@ export default function AsignacionesLayout() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => { setEditing(a); setModalOpen(true); }}
-                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 transition cursor-pointer"
                           title="Editar">
                           <Pencil size={14} />
                         </button>
                         <button onClick={() => handleDelete(a.id, deleteLabel)}
-                          className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition cursor-pointer"
                           title="Eliminar">
                           <Trash2 size={14} />
                         </button>
@@ -339,15 +339,15 @@ export default function AsignacionesLayout() {
 
         {/* Paginación */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-blue-50 text-xs text-gray-500">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 text-xs text-white/30">
             <span>Página {page} de {totalPages}</span>
             <div className="flex gap-1">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-30 transition cursor-pointer">
+                className="p-1.5 rounded-lg hover:bg-white/10 text-blue-400 disabled:opacity-30 transition cursor-pointer">
                 <ChevronLeft size={16} />
               </button>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-30 transition cursor-pointer">
+                className="p-1.5 rounded-lg hover:bg-white/10 text-blue-400 disabled:opacity-30 transition cursor-pointer">
                 <ChevronRight size={16} />
               </button>
             </div>
