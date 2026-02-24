@@ -1,269 +1,373 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Plus, Search, Pencil, Trash2, RefreshCw, BookCopy, ChevronLeft, ChevronRight,
+  Plus, Search, Pencil, Trash2, RefreshCw, BookCopy,
+  ChevronLeft, ChevronRight, CheckCircle2, XCircle, AlertTriangle, Info, X,
 } from 'lucide-react';
 import AsignacionesModal from './AsignacionesModal';
 import { API_CONFIG } from '../../../services/config';
 
-/* ── Tipos ──────────────────────────────────────────────────────────── */
+/* ─── Tipos ─────────────────────────────────────────────────── */
 interface Asignacion {
-    id: number;
-    grupo_id: number;
-    materia_id: number;
-    docente_id: number;
-    ciclo_escolar: string;
-    created_at: string;
-    grupo?: { id: number; nombre: string; codigo_grupo: string; carrera: string; semestre: number };
-    materia?: { id: number; nombre: string; codigo_materia: string; creditos: number; horas_semana: number };
-    docente?: {
-        id: number; codigo_docente: string;
-        user?: { nombre: string; apellido: string; email: string };
-    };
+  id: number;
+  grupo_id: number;
+  materia_id: number;
+  docente_id: number;
+  ciclo_escolar: string;
+  created_at: string;
+  grupo?:   { id: number; nombre: string; codigo_grupo: string; carrera: string; semestre: number };
+  materia?: { id: number; nombre: string; codigo_materia: string; creditos: number; horas_semana: number };
+  docente?: { id: number; codigo_docente: string; user?: { nombre: string; apellido: string; email: string } };
 }
 
-/* ── Helpers ─────────────────────────────────────────────────────────── */
+/* ─── Toast ─────────────────────────────────────────────────── */
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+interface Toast { id: number; type: ToastType; title: string; message: string }
+
+const toastAccent:   Record<ToastType, string> = { success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-amber-500', info: 'bg-blue-500' };
+const toastIconColor:Record<ToastType, string> = { success: 'text-green-400', error: 'text-red-400', warning: 'text-amber-400', info: 'text-blue-400' };
+const toastIconEl:   Record<ToastType, React.ReactNode> = {
+  success: <CheckCircle2 size={18} />, error: <XCircle size={18} />,
+  warning: <AlertTriangle size={18} />, info: <Info size={18} />,
+};
+
+function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+  return (
+    <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-3 w-[320px] pointer-events-none">
+      {toasts.map(t => (
+        <div key={t.id} className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto bg-slate-900 border border-slate-700">
+          <div className={`w-1 shrink-0 ${toastAccent[t.type]}`} />
+          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>{toastIconEl[t.type]}</div>
+          <div className="flex-1 py-3 pr-2 min-w-0">
+            <p className="text-white text-sm font-semibold leading-tight">{t.title}</p>
+            {t.message && <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>}
+          </div>
+          <button onClick={() => onRemove(t.id)} className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start">
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConfirmDialog({ open, message, onConfirm, onCancel }:
+  { open: boolean; message: string; onConfirm: () => void; onCancel: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 border border-gray-200">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-100 shrink-0">
+            <Trash2 size={20} className="text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-gray-900 font-bold text-base leading-tight">Eliminar registro</h3>
+            <p className="text-gray-500 text-sm mt-1 leading-snug">{message}</p>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
+          <button onClick={onCancel}
+            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium transition cursor-pointer">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition cursor-pointer shadow-[0_2px_8px_rgba(220,38,38,0.35)]">
+            Sí, eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Helpers ───────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = `${API_CONFIG.BASE_URL}/asignaciones`;
+const BASE      = `${API_CONFIG.BASE_URL}/asignaciones`;
 const PAGE_SIZE = 10;
 
-/* ── Badges ──────────────────────────────────────────────────────────── */
-const SEM_COLORS = ['', 'bg-blue-100 text-blue-700', 'bg-green-100 text-green-700',
-    'bg-yellow-100 text-yellow-700', 'bg-purple-100 text-purple-700',
-    'bg-pink-100 text-pink-700', 'bg-indigo-100 text-indigo-700'];
+const SEM_COLORS = [
+  '',
+  'bg-blue-100   text-blue-700   border border-blue-200',
+  'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  'bg-amber-100  text-amber-700  border border-amber-200',
+  'bg-purple-100 text-purple-700 border border-purple-200',
+  'bg-pink-100   text-pink-700   border border-pink-200',
+  'bg-indigo-100 text-indigo-700 border border-indigo-200',
+];
 
-/* ═════════════════════════════════════════════════════════════════════ */
+/* ─── Componente principal ──────────────────────────────────── */
 export default function AsignacionesLayout() {
-    const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
-    const [total, setTotal] = useState(0);
-    const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterCiclo, setFilterCiclo] = useState('');
+  const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
+  const [total, setTotal]               = useState(0);
+  const [page, setPage]                 = useState(1);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [searchTerm, setSearchTerm]     = useState('');
+  const [filterCiclo, setFilterCiclo]   = useState('');
+  const [modalOpen, setModalOpen]       = useState(false);
+  const [editing, setEditing]           = useState<Asignacion | null>(null);
+  const [toasts, setToasts]             = useState<Toast[]>([]);
+  const [confirm, setConfirm]           = useState<{ open: boolean; id?: number; label: string }>({ open: false, label: '' });
 
-    /* Modal */
-    const [modalOpen, setModalOpen] = useState(false);
-    const [editing, setEditing] = useState<Asignacion | null>(null);
+  const addToast = (type: ToastType, title: string, message = '') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
 
-    /* ── Fetch ─────────────────────────────────────────────────────────── */
-    const fetchAsignaciones = useCallback(async () => {
-        setLoading(true); setError(null);
-        try {
-            const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
-            if (filterCiclo.trim()) params.set('ciclo_escolar', filterCiclo.trim());
-            const res = await fetch(`${BASE}?${params}`, {
-                headers: { Authorization: `Bearer ${getToken()}` },
-            });
-            if (!res.ok) throw new Error(`Error ${res.status}`);
-            const data = await res.json();
-            setAsignaciones(data.asignaciones ?? []);
-            setTotal(data.total ?? 0);
-        } catch (e: any) {
-            setError(e.message ?? 'Error al cargar asignaciones');
-        } finally {
-            setLoading(false);
-        }
-    }, [page, filterCiclo]);
+  /* ── Fetch */
+  const fetchAsignaciones = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+      if (filterCiclo.trim()) params.set('ciclo_escolar', filterCiclo.trim());
+      const res = await fetch(`${BASE}?${params}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setAsignaciones(data.asignaciones ?? []);
+      setTotal(data.total ?? 0);
+    } catch (e: any) {
+      setError(e.message ?? 'Error al cargar asignaciones');
+    } finally { setLoading(false); }
+  }, [page, filterCiclo]);
 
-    useEffect(() => { fetchAsignaciones(); }, [fetchAsignaciones]);
+  useEffect(() => { fetchAsignaciones(); }, [fetchAsignaciones]);
 
-    /* ── Eliminar ──────────────────────────────────────────────────────── */
-    const handleDelete = async (id: number, label: string) => {
-        if (!confirm(`¿Eliminar la asignación "${label}"?\nEsto también eliminará sus horarios asociados.`)) return;
-        try {
-            const res = await fetch(`${BASE}/${id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${getToken()}` },
-            });
-            if (!res.ok) throw new Error(`Error ${res.status}`);
-            fetchAsignaciones();
-        } catch (e: any) {
-            alert(e.message ?? 'Error al eliminar');
-        }
-    };
+  /* ── Eliminar */
+  const handleDelete = (id: number, label: string) => {
+    setConfirm({ open: true, id, label });
+  };
+  const confirmDelete = async () => {
+    const { id, label } = confirm;
+    setConfirm({ open: false, label: '' });
+    if (!id) return;
+    try {
+      const res = await fetch(`${BASE}/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      await fetchAsignaciones();
+      addToast('info', 'Asignación eliminada', `"${label}" fue eliminada junto con sus horarios`);
+    } catch (e: any) {
+      addToast('error', 'No se pudo eliminar', e.message);
+    }
+  };
 
-    /* ── Filtro local ────────────────────────────────────────────────────── */
-    const filtered = asignaciones.filter((a) => {
-        const term = searchTerm.toLowerCase();
-        if (!term) return true;
-        const materia = a.materia?.nombre ?? '';
-        const grupo = a.grupo?.nombre ?? '';
-        const codigo = a.grupo?.codigo_grupo ?? '';
-        const docente = a.docente?.user
-            ? `${a.docente.user.nombre} ${a.docente.user.apellido}`
-            : a.docente?.codigo_docente ?? '';
-        return (
-            materia.toLowerCase().includes(term) ||
-            grupo.toLowerCase().includes(term) ||
-            codigo.toLowerCase().includes(term) ||
-            docente.toLowerCase().includes(term) ||
-            a.ciclo_escolar.toLowerCase().includes(term)
-        );
-    });
-
-    const totalPages = Math.ceil(total / PAGE_SIZE);
-
-    /* ── RENDER ──────────────────────────────────────────────────────────── */
+  /* ── Filtro local */
+  const filtered = asignaciones.filter(a => {
+    const term = searchTerm.toLowerCase();
+    if (!term) return true;
+    const materia = a.materia?.nombre ?? '';
+    const grupo   = a.grupo?.nombre ?? '';
+    const codigo  = a.grupo?.codigo_grupo ?? '';
+    const docente = a.docente?.user
+      ? `${a.docente.user.nombre} ${a.docente.user.apellido}`
+      : a.docente?.codigo_docente ?? '';
     return (
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3">
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <BookCopy className="text-indigo-600 shrink-0" size={26} />
-                    <div className="min-w-0">
-                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Asignaciones</h1>
-                        <p className="text-xs sm:text-sm text-gray-500">{total} asignación(es)</p>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={fetchAsignaciones}
-                        className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition shrink-0" title="Recargar">
-                        <RefreshCw size={14} className={`${loading ? 'animate-spin text-indigo-500' : 'text-gray-500'} w-4 h-4 sm:w-5 sm:h-5`} />
-                    </button>
-                    <button
-                        onClick={() => { setEditing(null); setModalOpen(true); }}
-                        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-xs sm:text-sm transition"
-                    >
-                        <Plus size={14} /> <span className="hidden sm:inline">Nueva</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Filtros */}
-            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-                <div className="relative flex-1 min-w-0 sm:min-w-52">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
-                    <input
-                        type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar materia, grupo, docente…"
-                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
-                <div className="relative w-full sm:w-44">
-                    <input
-                        type="text" value={filterCiclo} onChange={(e) => { setFilterCiclo(e.target.value); setPage(1); }}
-                        placeholder="Filtrar ciclo (2026-1)"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
-            </div>
-
-            {/* Error */}
-            {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
-            )}
-
-            {/* Tabla */}
-            <div className="bg-white rounded-lg sm:rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
-                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                        <tr>
-                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">#</th>
-                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Materia</th>
-                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Grupo</th>
-                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Docente</th>
-                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Ciclo</th>
-                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center font-semibold text-gray-600 whitespace-nowrap text-xs sm:text-sm">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={6} className="py-12 text-center">
-                                    <RefreshCw size={22} className="animate-spin text-indigo-500 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-400">Cargando asignaciones…</p>
-                                </td>
-                            </tr>
-                        ) : filtered.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} className="py-12 text-center text-gray-400 text-sm">
-                                    <BookCopy size={28} className="mx-auto mb-2 text-gray-300" />
-                                    No se encontraron asignaciones
-                                </td>
-                            </tr>
-                        ) : (
-                            filtered.map((a, i) => {
-                                const semColor = SEM_COLORS[a.grupo?.semestre ?? 0] ?? 'bg-gray-100 text-gray-600';
-                                const docLabel = a.docente?.user
-                                    ? `${a.docente.user.nombre} ${a.docente.user.apellido}`
-                                    : a.docente?.codigo_docente ?? '—';
-                                const deleteLabel = `${a.materia?.nombre ?? ''} → ${a.grupo?.nombre ?? ''}`;
-                                return (
-                                    <tr key={a.id} className="hover:bg-gray-50 transition">
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-400 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
-                                            <p className="font-medium text-gray-800 text-xs sm:text-sm">{a.materia?.nombre ?? '—'}</p>
-                                            <p className="text-xs text-gray-400">
-                                                {a.materia?.codigo_materia} · {a.materia?.horas_semana}h/sem · {a.materia?.creditos} cr.
-                                            </p>
-                                        </td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${semColor}`}>
-                                                    S{a.grupo?.semestre}
-                                                </span>
-                                                <div>
-                                                    <p className="font-medium text-gray-800 text-xs sm:text-sm">{a.grupo?.nombre ?? '—'}</p>
-                                                    <p className="text-xs text-gray-400">{a.grupo?.codigo_grupo} · {a.grupo?.carrera}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
-                                            <p className="font-medium text-gray-800 text-xs sm:text-sm">{docLabel}</p>
-                                            {a.docente?.user?.email && (
-                                                <p className="text-xs text-gray-400">{a.docente.user.email}</p>
-                                            )}
-                                        </td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
-                                            <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                                {a.ciclo_escolar}
-                                            </span>
-                                        </td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button onClick={() => { setEditing(a); setModalOpen(true); }}
-                                                    className="p-1.5 rounded hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 transition" title="Editar">
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button onClick={() => handleDelete(a.id, deleteLabel)}
-                                                    className="p-1.5 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 transition" title="Eliminar">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-
-                {/* Paginación */}
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500">
-                        <span>Pág. {page} de {totalPages}</span>
-                        <div className="flex gap-1">
-                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-40">
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-40">
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Modal */}
-            <AsignacionesModal
-                isOpen={modalOpen}
-                editing={editing}
-                onClose={() => { setModalOpen(false); setEditing(null); }}
-                onSaved={() => { setModalOpen(false); setEditing(null); fetchAsignaciones(); }}
-            />
-        </div>
+      materia.toLowerCase().includes(term) ||
+      grupo.toLowerCase().includes(term)   ||
+      codigo.toLowerCase().includes(term)  ||
+      docente.toLowerCase().includes(term) ||
+      a.ciclo_escolar.toLowerCase().includes(term)
     );
+  });
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  /* ── Render */
+  return (
+    <div className="p-4 sm:p-6 md:p-8">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ConfirmDialog
+        open={confirm.open}
+        message={`¿Deseas eliminar permanentemente la asignación "${confirm.label}"? También se eliminarán sus horarios asociados.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirm({ open: false, label: '' })}
+      />
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl
+                          bg-[linear-gradient(145deg,#1e56d9,#0d3ab0)]
+                          shadow-[0_4px_16px_rgba(15,63,196,0.45)]">
+            <BookCopy size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Asignaciones</h1>
+            <p className="text-gray-500 text-xs sm:text-sm">{total} asignación(es) registradas</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={fetchAsignaciones} title="Actualizar"
+            className="p-2 rounded-xl border border-blue-200 hover:bg-blue-50 transition text-blue-600 cursor-pointer">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            onClick={() => { setEditing(null); setModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm text-white cursor-pointer
+                       bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)]
+                       hover:shadow-[0_4px_16px_rgba(15,63,196,0.45)] hover:-translate-y-px transition-all duration-200">
+            <Plus size={16} />
+            <span className="hidden sm:inline">Nueva asignación</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-400" />
+          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar materia, grupo, docente…"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
+                       text-sm text-gray-700 placeholder:text-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
+                       backdrop-blur-sm transition" />
+        </div>
+        <div className="w-full sm:w-48">
+          <input type="text" value={filterCiclo} onChange={e => { setFilterCiclo(e.target.value); setPage(1); }}
+            placeholder="Filtrar por ciclo (2026-1)"
+            className="w-full px-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
+                       text-sm text-gray-700 placeholder:text-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
+                       backdrop-blur-sm transition" />
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && !loading && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
+          <XCircle size={18} className="shrink-0 text-red-500" />{error}
+        </div>
+      )}
+
+      {/* Tabla */}
+      <div className="bg-white/80 backdrop-blur-sm border border-blue-100 rounded-2xl shadow-sm overflow-x-auto">
+        <table className="w-full text-sm border-collapse min-w-max">
+          <thead>
+            <tr className="bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] text-white">
+              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap first:rounded-tl-2xl text-xs tracking-wide">#</th>
+              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Materia</th>
+              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Grupo</th>
+              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Docente</th>
+              <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Ciclo</th>
+              <th className="text-center px-4 py-3 font-semibold whitespace-nowrap last:rounded-tr-2xl text-xs tracking-wide">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-blue-50">
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="py-16 text-center">
+                  <RefreshCw size={26} className="animate-spin text-blue-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">Cargando asignaciones…</p>
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-16 text-center">
+                  <BookCopy size={30} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm text-gray-400">
+                    {searchTerm ? 'Sin resultados para la búsqueda' : 'No hay asignaciones registradas'}
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              filtered.map((a, i) => {
+                const semColor   = SEM_COLORS[a.grupo?.semestre ?? 0] ?? 'bg-gray-100 text-gray-600';
+                const docLabel   = a.docente?.user
+                  ? `${a.docente.user.nombre} ${a.docente.user.apellido}`
+                  : a.docente?.codigo_docente ?? '—';
+                const deleteLabel = `${a.materia?.nombre ?? ''} → ${a.grupo?.nombre ?? ''}`;
+
+                return (
+                  <tr key={a.id} className="hover:bg-blue-50/50 transition-colors">
+                    <td className="px-4 py-3 text-gray-400 text-xs">{(page - 1) * PAGE_SIZE + i + 1}</td>
+
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-800 text-sm">{a.materia?.nombre ?? '—'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {a.materia?.codigo_materia} · {a.materia?.horas_semana}h/sem · {a.materia?.creditos} cr.
+                      </p>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${semColor}`}>
+                          S{a.grupo?.semestre}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-gray-800 text-sm">{a.grupo?.nombre ?? '—'}</p>
+                          <p className="text-xs text-gray-400">{a.grupo?.codigo_grupo} · {a.grupo?.carrera}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-800 text-sm">{docLabel}</p>
+                      {a.docente?.user?.email && (
+                        <p className="text-xs text-gray-400">{a.docente.user.email}</p>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        {a.ciclo_escolar}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => { setEditing(a); setModalOpen(true); }}
+                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition cursor-pointer"
+                          title="Editar">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => handleDelete(a.id, deleteLabel)}
+                          className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition cursor-pointer"
+                          title="Eliminar">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+
+        {/* Paginación */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-blue-50 text-xs text-gray-500">
+            <span>Página {page} de {totalPages}</span>
+            <div className="flex gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-30 transition cursor-pointer">
+                <ChevronLeft size={16} />
+              </button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-30 transition cursor-pointer">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      <AsignacionesModal
+        isOpen={modalOpen}
+        editing={editing}
+        onClose={() => { setModalOpen(false); setEditing(null); }}
+        onSaved={() => {
+          setModalOpen(false); setEditing(null); fetchAsignaciones();
+          addToast('success',
+            editing ? 'Asignación actualizada' : 'Asignación creada',
+            editing ? 'Los cambios fueron guardados' : 'Nueva asignación registrada exitosamente'
+          );
+        }}
+      />
+    </div>
+  );
 }
