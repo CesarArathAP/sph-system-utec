@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Pencil, Trash2, RefreshCw, Building2, PowerOff, Power } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, RefreshCw, Building2, PowerOff, Power,
+         CheckCircle2, XCircle, AlertTriangle, X, Info } from 'lucide-react';
 import AulasModal from './AulasModal';
 import { API_CONFIG } from '../../../services/config';
 
+/* ─── Tipos ─────────────────────────────────────────────────── */
 interface Aula {
   id?: string;
   codigo: string;
@@ -17,61 +19,178 @@ interface Aula {
   updatedAt?: string;
 }
 
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+interface Toast { id: number; type: ToastType; title: string; message: string; }
+
+/* ─── Toast Component — diseño profesional ──────────────────── */
+const toastAccent: Record<ToastType, string> = {
+  success: 'bg-green-500',
+  error:   'bg-red-500',
+  warning: 'bg-amber-500',
+  info:    'bg-blue-500',
+};
+const toastIconColor: Record<ToastType, string> = {
+  success: 'text-green-400',
+  error:   'text-red-400',
+  warning: 'text-amber-400',
+  info:    'text-blue-400',
+};
+const toastIconEl: Record<ToastType, React.ReactNode> = {
+  success: <CheckCircle2  size={18} />,
+  error:   <XCircle       size={18} />,
+  warning: <AlertTriangle size={18} />,
+  info:    <Info          size={18} />,
+};
+const toastLabel: Record<ToastType, string> = {
+  success: 'Éxito',
+  error:   'Error',
+  warning: 'Advertencia',
+  info:    'Información',
+};
+
+function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+  return (
+    <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-3 w-[320px] pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto
+                     bg-slate-900 border border-slate-700"
+        >
+          {/* Barra lateral de color */}
+          <div className={`w-1 shrink-0 ${toastAccent[t.type]}`} />
+
+          {/* Ícono */}
+          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>
+            {toastIconEl[t.type]}
+          </div>
+
+          {/* Contenido */}
+          <div className="flex-1 py-3 pr-2 min-w-0">
+            <p className="text-white text-sm font-semibold leading-tight">{t.title}</p>
+            {t.message && (
+              <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>
+            )}
+          </div>
+
+          {/* Cerrar */}
+          <button
+            onClick={() => onRemove(t.id)}
+            className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Confirm Dialog — diseño profesional ───────────────────── */
+function ConfirmDialog({
+  open, message, onConfirm, onCancel,
+}: { open: boolean; message: string; onConfirm: () => void; onCancel: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4
+                      border border-gray-200">
+        {/* Cabecera */}
+        <div className="flex items-start gap-4 mb-4">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-100 shrink-0">
+            <Trash2 size={20} className="text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-gray-900 font-bold text-base leading-tight">Eliminar registro</h3>
+            <p className="text-gray-500 text-sm mt-1 leading-snug">{message}</p>
+          </div>
+        </div>
+        {/* Botones */}
+        <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700
+                       hover:bg-gray-50 text-sm font-medium transition cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white
+                       text-sm font-semibold transition cursor-pointer
+                       shadow-[0_2px_8px_rgba(220,38,38,0.35)]"
+          >
+            Sí, eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Helpers ───────────────────────────────────────────────── */
 function toBackend(a: Aula) {
   return {
     codigo_aula: a.codigo,
     nombre: a.nombre,
-    capacidad: a.capacidad || 1,           // mínimo 1 (schema ge=1)
+    capacidad: a.capacidad || 1,
     tipo: a.tipo,
     edificio: a.edificio || null,
-    piso: (a.piso && a.piso > 0) ? a.piso : null,  // null si 0 o vacío (schema ge=1)
+    piso: (a.piso && a.piso > 0) ? a.piso : null,
     equipamiento: a.equipamiento || null,
     activo: a.activo,
   };
 }
-
 function fromBackend(b: any): Aula {
   return {
     id: String(b.id),
     codigo: b.codigo_aula,
     nombre: b.nombre,
     capacidad: b.capacidad,
-    tipo: (b.tipo ?? '').toLowerCase(),      // el backend puede devolver 'COMPUTO' en mayúsculas
+    tipo: (b.tipo ?? '').toLowerCase(),
     edificio: b.edificio ?? '',
     piso: b.piso ?? null,
-    equipamiento: b.equipamiento ?? '',     // puede llegar null si no tiene equipamiento
+    equipamiento: b.equipamiento ?? '',
     activo: b.activo ?? true,
     createdAt: b.created_at,
     updatedAt: b.updated_at,
   };
 }
-
-function getToken() {
-  return localStorage.getItem('auth_token') ?? '';
-}
-
+function getToken() { return localStorage.getItem('auth_token') ?? ''; }
 const BASE = `${API_CONFIG.BASE_URL}/aulas`;
 
 const tipoColors: Record<string, string> = {
-  normal: 'bg-gray-100   text-gray-700',
-  computo: 'bg-blue-100   text-blue-700',
-  laboratorio: 'bg-green-100  text-green-700',
-  auditorio: 'bg-purple-100 text-purple-700',
+  normal:      'bg-blue-100   text-blue-700   border border-blue-200',
+  teoria:      'bg-blue-100   text-blue-700   border border-blue-200',
+  computo:     'bg-cyan-100   text-cyan-700   border border-cyan-200',
+  laboratorio: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  auditorio:   'bg-purple-100 text-purple-700  border border-purple-200',
 };
 
+/* ─── Componente principal ──────────────────────────────────── */
 export default function AulasLayout() {
-  const [aulas, setAulas] = useState<Aula[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [aulas, setAulas]             = useState<Aula[]>([]);
+  const [total, setTotal]             = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [searchTerm, setSearchTerm]   = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAula, setSelectedAula] = useState<Aula | null>(null);
+  const [toasts, setToasts]           = useState<Toast[]>([]);
+  const [confirm, setConfirm]         = useState<{ open: boolean; id?: string; msg: string }>({ open: false, msg: '' });
 
-  /* ─── Fetch ─────────────────────────────────────────────────── */
+  /* ── Toast helpers ── */
+  const addToast = (type: ToastType, title: string, message = '') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, title, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  /* ── Fetch ── */
   const fetchAulas = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await fetch(`${BASE}?page=1&page_size=100`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -89,17 +208,15 @@ export default function AulasLayout() {
 
   useEffect(() => { fetchAulas(); }, [fetchAulas]);
 
-  /* ─── Crear / Editar ─────────────────────────────────────────── */
+  /* ── Guardar ── */
   const handleSave = async (aula: Aula) => {
+    const isNew = !selectedAula?.id;
     try {
-      const method = selectedAula?.id ? 'PUT' : 'POST';
-      const url = selectedAula?.id ? `${BASE}/${selectedAula.id}` : BASE;
+      const method = isNew ? 'POST' : 'PUT';
+      const url    = isNew ? BASE : `${BASE}/${selectedAula!.id}`;
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(toBackend(aula)),
       });
       if (!res.ok) {
@@ -109,32 +226,46 @@ export default function AulasLayout() {
       }
       setIsModalOpen(false);
       await fetchAulas();
+      addToast('success',
+        isNew ? 'Aula creada' : 'Aula actualizada',
+        isNew ? `"${aula.nombre}" fue registrada exitosamente` : `"${aula.nombre}" fue actualizada`
+      );
     } catch (e: any) {
-      alert(`No se pudo guardar: ${e.message}`);
+      addToast('error', 'No se pudo guardar', e.message);
     }
   };
 
-  /* ─── Suspender / Activar ────────────────────────────────────── */
+  /* ── Toggle activo ── */
   const handleToggleActivo = async (aula: Aula) => {
     try {
       const res = await fetch(`${BASE}/${aula.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(toBackend({ ...aula, activo: !aula.activo })),
       });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       await fetchAulas();
+      addToast(
+        aula.activo ? 'warning' : 'success',
+        aula.activo ? 'Aula suspendida' : 'Aula activada',
+        `"${aula.nombre}" fue ${aula.activo ? 'suspendida' : 'activada'}`
+      );
     } catch (e: any) {
-      alert(`No se pudo actualizar: ${e.message}`);
+      addToast('error', 'No se pudo actualizar', e.message);
     }
   };
 
-  /* ─── Eliminar ───────────────────────────────────────────────── */
-  const handleDelete = async (id: string | undefined) => {
-    if (!id || !confirm('¿Eliminar esta aula?')) return;
+  /* ── Eliminar ── */
+  const handleDelete = (id: string | undefined) => {
+    if (!id) return;
+    const aula = aulas.find(a => a.id === id);
+    setConfirm({ open: true, id, msg: `¿Deseas eliminar permanentemente el aula "${aula?.nombre ?? id}"?` });
+  };
+  const confirmDelete = async () => {
+    const id = confirm.id;
+    setConfirm({ open: false, msg: '' });
+    if (!id) return;
+    const aula = aulas.find(a => a.id === id);
     try {
       const res = await fetch(`${BASE}/${id}`, {
         method: 'DELETE',
@@ -142,28 +273,40 @@ export default function AulasLayout() {
       });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       await fetchAulas();
+      addToast('info', 'Aula eliminada', `"${aula?.nombre ?? id}" fue eliminada`);
     } catch (e: any) {
-      alert(`No se pudo eliminar: ${e.message}`);
+      addToast('error', 'No se pudo eliminar', e.message);
     }
   };
 
-  /* ─── Filtro local ───────────────────────────────────────────── */
-  const filtered = aulas.filter(
-    (a) =>
-      a.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.edificio ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+  /* ── Filtro ── */
+  const filtered = aulas.filter(a =>
+    a.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.edificio ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  /* ─── UI ─────────────────────────────────────────────────────── */
+  /* ── Render ── */
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3 mb-4 sm:mb-6">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Building2 className="text-blue-600 shrink-0" size={26} />
-          <div className="min-w-0">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ConfirmDialog
+        open={confirm.open}
+        message={confirm.msg}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirm({ open: false, msg: '' })}
+      />
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl
+                          bg-[linear-gradient(145deg,#1e56d9,#0d3ab0)]
+                          shadow-[0_4px_16px_rgba(15,63,196,0.45)]">
+            <Building2 size={20} className="text-white" />
+          </div>
+          <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Aulas</h1>
             <p className="text-gray-500 text-xs sm:text-sm">{total} aulas registradas</p>
           </div>
@@ -171,110 +314,121 @@ export default function AulasLayout() {
         <div className="flex gap-2">
           <button
             onClick={fetchAulas}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition shrink-0"
             title="Actualizar"
+            className="p-2 rounded-xl border border-blue-200 hover:bg-blue-50 transition text-blue-600"
           >
-            <RefreshCw size={14} className={`${loading ? 'animate-spin text-blue-500' : 'text-gray-500'} w-4 h-4 sm:w-5 sm:h-5`} />
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
             onClick={() => { setSelectedAula(null); setIsModalOpen(true); }}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition text-xs sm:text-sm"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm text-white
+                       bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)]
+                       hover:shadow-[0_4px_16px_rgba(15,63,196,0.45)]
+                       hover:-translate-y-px transition-all duration-200 cursor-pointer"
           >
-            <Plus size={14} />
-            <span className="hidden sm:inline">Nueva aula</span><span className="sm:hidden">+</span>
+            <Plus size={16} />
+            <span className="hidden sm:inline">Nueva aula</span>
           </button>
         </div>
       </div>
 
-      {/* Buscador */}
-      <div className="relative mb-4 sm:mb-5">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0" />
+      {/* ── Buscador ── */}
+      <div className="relative mb-5">
+        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-400" />
         <input
           type="text"
-          placeholder="Buscar código, nombre, tipo..."
+          placeholder="Buscar código, nombre, tipo, edificio..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={e => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white/70
+                     text-sm text-gray-700 placeholder:text-gray-400
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent
+                     backdrop-blur-sm transition"
         />
       </div>
 
-      {/* Estado de carga / error */}
+      {/* ── Loading ── */}
       {loading && (
-        <div className="flex justify-center py-12 sm:py-16">
-          <RefreshCw size={24} className="animate-spin text-blue-500" />
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <RefreshCw size={28} className="animate-spin text-blue-500" />
+          <span className="text-gray-400 text-sm">Cargando aulas...</span>
         </div>
       )}
+
+      {/* ── Error ── */}
       {error && !loading && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm mb-4">
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200
+                        text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
+          <XCircle size={18} className="shrink-0 text-red-500" />
           {error}
         </div>
       )}
 
-      {/* Tabla */}
+      {/* ── Tabla ── */}
       {!loading && !error && (
-        <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
-            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0\">
-              <tr>
-                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap\">Código</th>
-                <th className="text-left px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap\">Nombre</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap\">Tipo</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Capacidad</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Edificio</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap">Piso</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap\">Activo</th>
-                <th className="text-center px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 whitespace-nowrap\">Acciones</th>
+        <div className="bg-white/80 backdrop-blur-sm border border-blue-100 rounded-2xl shadow-sm overflow-x-auto">
+          <table className="w-full text-sm border-collapse min-w-max">
+            <thead>
+              <tr className="bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] text-white">
+                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap first:rounded-tl-2xl text-xs tracking-wide">Código</th>
+                <th className="text-left px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Nombre</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Tipo</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Capacidad</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Edificio</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Piso</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap text-xs tracking-wide">Estado</th>
+                <th className="text-center px-4 py-3 font-semibold whitespace-nowrap last:rounded-tr-2xl text-xs tracking-wide">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100\">
+            <tbody className="divide-y divide-blue-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 sm:py-12 text-gray-400 px-4 text-xs sm:text-sm\">
+                  <td colSpan={8} className="text-center py-14 text-gray-400 text-sm">
                     {searchTerm ? 'Sin resultados para la búsqueda' : 'No hay aulas registradas'}
                   </td>
                 </tr>
               ) : (
                 filtered.map((aula) => (
-                  <tr key={aula.id} className="hover:bg-gray-50 transition\">
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 font-mono font-semibold text-gray-800 text-xs sm:text-sm\">{aula.codigo}</td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-700 max-w-xs truncate text-xs sm:text-sm\" title={aula.nombre}>
-                      {aula.nombre}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center whitespace-nowrap\">
-                      <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-medium capitalize inline-block ${tipoColors[aula.tipo?.toLowerCase()] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {aula.tipo}
+                  <tr key={aula.id} className="hover:bg-blue-50/50 transition-colors">
+                    <td className="px-4 py-3 font-mono font-semibold text-blue-700 text-xs">{aula.codigo}</td>
+                    <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate text-sm" title={aula.nombre}>{aula.nombre}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize
+                                        ${tipoColors[aula.tipo?.toLowerCase()] ?? 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                        {aula.tipo || '—'}
                       </span>
                     </td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-700 text-xs sm:text-sm">{aula.capacidad}</td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-600 text-xs sm:text-sm">{aula.edificio || '—'}</td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-600 text-xs sm:text-sm">{aula.piso ?? '—'}</td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center whitespace-nowrap\">
-                      <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-semibold inline-block text-nowrap ${aula.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                    <td className="px-4 py-3 text-center text-gray-700 text-sm">{aula.capacidad}</td>
+                    <td className="px-4 py-3 text-center text-gray-600 text-sm">{aula.edificio || '—'}</td>
+                    <td className="px-4 py-3 text-center text-gray-600 text-sm">{aula.piso ?? '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
+                                        ${aula.activo
+                                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                          : 'bg-red-100   text-red-700   border border-red-200'}`}>
                         {aula.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
-                    <td className="px-2 sm:px-4 py-2 sm:py-3\">
-                      <div className="flex items-center justify-center gap-0.5 sm:gap-1\">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => { setSelectedAula(aula); setIsModalOpen(true); }}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition"
+                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition cursor-pointer"
                           title="Editar"
                         >
                           <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => handleToggleActivo(aula)}
-                          className={`p-1.5 rounded-lg transition ${aula.activo
-                            ? 'hover:bg-amber-50 text-amber-500'
-                            : 'hover:bg-green-50 text-green-600'
-                            }`}
+                          className={`p-1.5 rounded-lg transition cursor-pointer
+                            ${aula.activo ? 'hover:bg-amber-100 text-amber-500' : 'hover:bg-emerald-100 text-emerald-600'}`}
                           title={aula.activo ? 'Suspender' : 'Activar'}
                         >
                           {aula.activo ? <PowerOff size={14} /> : <Power size={14} />}
                         </button>
                         <button
                           onClick={() => handleDelete(aula.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition"
+                          className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition cursor-pointer"
                           title="Eliminar"
                         >
                           <Trash2 size={14} />
@@ -289,7 +443,7 @@ export default function AulasLayout() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* ── Modal ── */}
       <AulasModal
         isOpen={isModalOpen}
         aula={selectedAula}
