@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { RefreshCw, ClipboardList, Wand2, AlertTriangle, CheckCircle, Clock, BarChart2 } from 'lucide-react';
+import { RefreshCw, ClipboardList, Wand2, AlertTriangle, CheckCircle, Clock, BarChart2, CalendarDays } from 'lucide-react';
 
 import { API_CONFIG } from '../../../services/config';
+import DisponibilidadViewModal from '../profesores/DisponibilidadViewModal';
+import type { Docente } from '../profesores/ProfesoresLayout';
 
 interface AssignmentModalProps {
   isOpen: boolean;
@@ -16,7 +18,7 @@ interface AsignacionOption {
   ciclo_escolar: string;
   grupo?: { nombre: string; codigo_grupo: string };
   materia?: { nombre: string };
-  docente?: { codigo_docente: string; user?: { nombre: string; apellido: string } };
+  docente?: Docente;
 }
 
 interface AulaOption {
@@ -94,6 +96,14 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
   const [horasMaxError, setHorasMaxError] = useState<{
     limite: number; horas_actuales: number; horas_nuevas: number; horas_totales: number; sugerencia: string;
   } | null>(null);
+
+  /* ── Modal disponibilidad (solo lectura) ────────────────────────── */
+  const [showDisponibilidad, setShowDisponibilidad] = useState(false);
+
+  /* Docente derivado de la asignación seleccionada */
+  const docenteSeleccionado: Docente | null = (
+    asignaciones.find((a) => a.id === form.asignacion_id)?.docente ?? null
+  ) as Docente | null;
 
 
   /* ── Tab Automático ─────────────────────────────────────────────── */
@@ -211,11 +221,12 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
 
   /* ── RENDER ─────────────────────────────────────────────────────── */
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
+    <>
+      <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
                      bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh]
                      overflow-y-auto focus:outline-none"
           onEscapeKeyDown={onClose}
@@ -323,6 +334,24 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
                     </select>
                     {asignaciones.length === 0 && (
                       <p className="text-xs text-amber-600 mt-1">⚠ No hay asignaciones registradas.</p>
+                    )}
+
+                    {/* Botón ver disponibilidad del docente */}
+                    {docenteSeleccionado && form.asignacion_id !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDisponibilidad(true)}
+                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
+                        title="Ver disponibilidad del docente asignado"
+                      >
+                        <CalendarDays size={13} />
+                        Ver disponibilidad del docente
+                        {docenteSeleccionado.disponibilidades?.length !== undefined && (
+                          <span className="ml-1 bg-indigo-200 text-indigo-800 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                            {docenteSeleccionado.disponibilidades.length} bloques
+                          </span>
+                        )}
+                      </button>
                     )}
                   </div>
 
@@ -587,6 +616,14 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
           </div>
         </Dialog.Content>
       </Dialog.Portal>
-    </Dialog.Root>
+      </Dialog.Root>
+
+      {/* Modal disponibilidad — solo lectura, sobre el modal principal */}
+      <DisponibilidadViewModal
+        isOpen={showDisponibilidad}
+        docente={docenteSeleccionado}
+        onClose={() => setShowDisponibilidad(false)}
+      />
+    </>
   );
 }
