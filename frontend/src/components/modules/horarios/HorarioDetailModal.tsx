@@ -373,6 +373,28 @@ export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Prop
                                                 </option>
                                             ))}
                                         </select>
+                                        
+                                        {/* Alerta de capacidad insuficiente */}
+                                        {editForm.aula_id && horario?.asignacion?.grupo?.num_estudiantes && (() => {
+                                            const aulaSelecc = aulas.find(a => a.id === editForm.aula_id);
+                                            const numEstuds = horario.asignacion.grupo.num_estudiantes;
+                                            if (aulaSelecc && numEstuds > aulaSelecc.capacidad) {
+                                                return (
+                                                    <div className="mt-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm flex gap-2 items-start">
+                                                        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="font-semibold">⚠️ Capacidad insuficiente</p>
+                                                            <p className="text-xs mt-1">
+                                                                El aula <strong>{aulaSelecc.nombre}</strong> tiene capacidad para <strong>{aulaSelecc.capacidad}</strong> personas,
+                                                                pero el grupo <strong>{horario.asignacion.grupo.nombre}</strong> tiene <strong>{numEstuds}</strong> estudiantes.
+                                                                Faltan <strong>{numEstuds - aulaSelecc.capacidad}</strong> lugares.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                     </div>
 
                                     <div className="flex gap-3 pt-2">
