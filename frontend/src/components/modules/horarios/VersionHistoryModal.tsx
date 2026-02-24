@@ -28,6 +28,7 @@ export default function HorarioVersionHistoryModal({
   isOpen,
   onClose,
 }: HorarioVersionHistoryModalProps) {
+  const { addToast } = useToast();
   const [versions, setVersions] = useState<Version[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<number | null>(null);
