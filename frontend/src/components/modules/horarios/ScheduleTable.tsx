@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus, Eye, History, List, Grid, AlertCircle, X } from 'lucide-react';
+import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus, Eye, History, List, Grid, AlertCircle, X, Clock, Bookmark, Search } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { API_CONFIG } from '../../../services/config';
 import HorarioDetailModal from './HorarioDetailModal';
 import VersionHistoryModal from './VersionHistoryModal';
@@ -35,7 +36,7 @@ interface ConflictoRegistrado {
   resolved_at?: string | null;
 }
 
-/* ── Constantes del grid ────────────────────────────────────────────── */
+/* ── Constantes Visuales Dark Premium ───────────────────────────────── */
 const DAYS = [
   { label: 'Lunes', value: 'lunes' },
   { label: 'Martes', value: 'martes' },
@@ -51,35 +52,24 @@ for (let h = 7; h < 22; h++) {
 }
 
 const TIPO_COLORS: Record<string, string> = {
-  teorica: 'bg-blue-100 border-blue-300 text-blue-800',
-  practica: 'bg-purple-100 border-purple-300 text-purple-800',
-  laboratorio: 'bg-green-100 border-green-300 text-green-800',
+  teorica: 'bg-blue-500/20 border-blue-500/30 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.1)]',
+  practica: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.1)]',
+  laboratorio: 'bg-violet-500/20 border-violet-500/30 text-violet-300 shadow-[0_0_15px_rgba(139,92,246,0.1)]',
 };
 
 const TIPO_LABEL: Record<string, string> = {
   teorica: 'Teórica', practica: 'Práctica', laboratorio: 'Lab.',
 };
 
-const CONFLICTO_COLORS: Record<string, string> = {
-  aula_ocupada: 'bg-red-100 text-red-800',
-  docente_ocupado: 'bg-orange-100 text-orange-800',
-  grupo_ocupado: 'bg-yellow-100 text-yellow-800',
-  disponibilidad_docente: 'bg-purple-100 text-purple-800',
-};
-
 /* ── Helpers ────────────────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-
 const BASE = API_CONFIG.BASE_URL;
-
-function timeToHour(t: string): number {
-  return parseInt(t.split(':')[0], 10);
-}
+function timeToHour(t: string): number { return parseInt(t.split(':')[0], 10); }
 
 /* ── Componente principal ───────────────────────────────────────────── */
 interface ScheduleTableProps {
   onAssignClick: () => void;
-  refreshKey?: number;   // incrementar para forzar recarga
+  refreshKey?: number;
 }
 
 export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: ScheduleTableProps) {
@@ -89,6 +79,8 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [loadingConf, setLoadingConf] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filtros
   const [filterDia, setFilterDia] = useState<string>('');
   const [cicloInput, setCicloInput] = useState('');
   const [filterDocente, setFilterDocente] = useState('');
@@ -96,12 +88,14 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
   const [filterGrupo, setFilterGrupo] = useState('');
   const [filterMateria, setFilterMateria] = useState('');
   const [filterDepartamento, setFilterDepartamento] = useState('');
+  
+  // Vistas y Modales
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [versionHistoryHorarioId, setVersionHistoryHorarioId] = useState<number | null>(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showConflictosModal, setShowConflictosModal] = useState(false);
-  const [horarioVersiones, setHorarioVersiones] = useState<Record<number, { version: number; cambios: string }>>({}); // horario_id -> {version, cambios} // horario_id -> {version, cambios}
+  const [horarioVersiones, setHorarioVersiones] = useState<Record<number, { version: number; cambios: string }>>({});
 
   /* ── Fetch horarios ───────────────────────────────────────────────── */
   const fetchHorarios = useCallback(async () => {
@@ -112,60 +106,50 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       const res = await fetch(`${BASE}/horarios?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
+      if (!res.ok) throw new Error(`Error de Conexión: ${res.status}`);
       const data = await res.json();
-      setHorarios(data.horarios ?? []);
+      const rawHorarios = data.horarios ?? [];
+      setHorarios(rawHorarios);
       
-      // Obtener versiones de cada horario
-      if (data.horarios && data.horarios.length > 0) {
-        const versiones: Record<number, { version: number; cambios: string }> = {};
-        for (const h of data.horarios) {
+      // Obtener versiones (Lógica de auditoría original)
+      if (rawHorarios.length > 0) {
+        const versionesMap: Record<number, { version: number; cambios: string }> = {};
+        // Para no saturar el servidor, obtenemos versiones para los que estamos mostrando
+        const slice = rawHorarios.slice(0, 100); 
+        
+        await Promise.all(slice.map(async (h: HorarioResponse) => {
           try {
-            const versionRes = await fetch(`${BASE}/horarios/${h.id}/versiones?page=1&page_size=100`, {
+            const vRes = await fetch(`${BASE}/horarios/${h.id}/versiones?page=1&page_size=100`, {
               headers: { Authorization: `Bearer ${getToken()}` },
             });
-            if (versionRes.ok) {
-              const versionData = await versionRes.json();
-              const allVersions = versionData.versiones || [];
+            if (vRes.ok) {
+              const vData = await vRes.json();
+              const allVersions = vData.versiones || [];
               if (allVersions.length > 0) {
                 const maxVersion = Math.max(...allVersions.map((v: any) => v.version_numero));
-                // Obtener la última versión para mostrar el cambio
                 const lastVersion = allVersions.find((v: any) => v.version_numero === maxVersion);
                 
                 let cambioTexto = '';
                 if (lastVersion && lastVersion.estado_anterior) {
-                  // Extraer cambios específicos
                   const cambios = [];
                   const oldState = lastVersion.estado_anterior;
                   const newState = lastVersion.estado_nuevo;
-                  
-                  // Verificar cambios comunes
                   if (oldState.hora_inicio !== newState.hora_inicio || oldState.hora_fin !== newState.hora_fin) {
-                    cambios.push(`Hora: ${oldState.hora_inicio}-${oldState.hora_fin} → ${newState.hora_inicio}-${newState.hora_fin}`);
+                    cambios.push(`Hora: ${oldState.hora_inicio.slice(0,5)}→${newState.hora_inicio.slice(0,5)}`);
                   }
-                  if (oldState.aula_id !== newState.aula_id) {
-                    cambios.push(`Aula: ${oldState.aula_id} → ${newState.aula_id}`);
-                  }
-                  if (oldState.dia_semana !== newState.dia_semana) {
-                    cambios.push(`Día: ${oldState.dia_semana} → ${newState.dia_semana}`);
-                  }
-                  if (oldState.tipo_sesion !== newState.tipo_sesion) {
-                    cambios.push(`Tipo: ${oldState.tipo_sesion} → ${newState.tipo_sesion}`);
-                  }
-                  
+                  if (oldState.aula_id !== newState.aula_id) cambios.push(`Aula`);
+                  if (oldState.dia_semana !== newState.dia_semana) cambios.push(`Día`);
+                  if (oldState.tipo_sesion !== newState.tipo_sesion) cambios.push(`Tipo`);
                   cambioTexto = cambios.length > 0 ? cambios.join(' | ') : 'Modificado';
                 } else {
                   cambioTexto = 'Creado';
                 }
-                
-                versiones[h.id] = { version: maxVersion, cambios: cambioTexto };
+                versionesMap[h.id] = { version: maxVersion, cambios: cambioTexto };
               }
             }
-          } catch {
-            // Ignorar errores de versiones individuales
-          }
-        }
-        setHorarioVersiones(versiones);
+          } catch {}
+        }));
+        setHorarioVersiones(versionesMap);
       }
     } catch (e: any) {
       setError(e.message);
@@ -174,17 +158,17 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
     }
   }, [filterDia, refreshKey]);
 
-  /* ── Fetch conflictos registrados ───────────────────────────────────── */
+  /* ── Conflictos ── */
   const fetchConflictos = useCallback(async () => {
     setLoadingConf(true);
     try {
-      // Usamos el endpoint de conflictos REGISTRADOS (tienen ID para poder resolverlos)
       const res = await fetch(`${BASE}/horarios/registered-conflicts/list?page=1&page_size=100`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setConflictos(data.conflictos ?? []);
+      if (res.ok) {
+        const data = await res.json();
+        setConflictos(data.conflictos ?? []);
+      }
     } catch {
       setConflictos([]);
     } finally {
@@ -192,98 +176,71 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
     }
   }, []);
 
-  /* ── Marcar conflicto como resuelto ─────────────────────────────────── */
-  const resolveConflict = async (conflictoId: number) => {
+  const resolveConflict = async (id: number) => {
     try {
-      const res = await fetch(`${BASE}/horarios/conflicts/${conflictoId}/resolve`, {
+      const res = await fetch(`${BASE}/horarios/conflicts/${id}/resolve`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!res.ok) throw new Error();
-      fetchConflictos();   // refrescar panel
+      if (res.ok) {
+        fetchConflictos();
+        Swal.fire({
+          icon: 'success', title: 'Resuelto', text: 'El conflicto ha sido marcado como resuelto.',
+          toast: true, position: 'top-end', timer: 2500, showConfirmButton: false, background: '#0f172a', color: '#f8fafc'
+        });
+      }
     } catch {
-      alert('Error al resolver el conflicto');
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo resolver el conflicto.', background: '#0f172a', color: '#f8fafc' });
     }
-  };  /* ── Limpiar historial de conflictos ───────────────────────────────── */
+  };
+
   const clearConflicts = async (todos = false) => {
-    const msg = todos
-      ? '¿Eliminar TODOS los conflictos (resueltos y pendientes)? Esta acción no se puede deshacer.'
-      : '¿Eliminar solo los conflictos ya resueltos del historial?';
-    if (!confirm(msg)) return;
+    const result = await Swal.fire({
+      title: todos ? '¿Limpiar Todo el Historial?' : '¿Limpiar Conflictos Resueltos?',
+      text: todos ? 'Esta acción borrará todos los registros de conflictos permanentemente.' : 'Se eliminarán únicamente los conflictos ya resueltos.',
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a', color: '#f8fafc',
+      confirmButtonColor: todos ? '#ef4444' : '#10b981',
+      cancelButtonColor: '#475569',
+      confirmButtonText: todos ? 'Sí, borrar todo' : 'Sí, limpiar resueltos',
+      cancelButtonText: 'Cancelar',
+      customClass: { popup: 'rounded-3xl border border-white/10 shadow-2xl backdrop-blur-xl' }
+    });
+
+    if (!result.isConfirmed) return;
 
     setClearing(true);
     try {
-      const res = await fetch(
-        `${BASE}/horarios/conflicts/clear${todos ? '?todos=true' : ''}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } }
-      );
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      alert(data.mensaje);
-      fetchConflictos();
+      const res = await fetch(`${BASE}/horarios/conflicts/clear${todos ? '?todos=true' : ''}`, { 
+        method: 'DELETE', 
+        headers: { Authorization: `Bearer ${getToken()}` } 
+      });
+      if (res.ok) {
+        fetchConflictos();
+        Swal.fire({ icon: 'success', title: 'Historial Limpio', background: '#0f172a', color: '#f8fafc' });
+      }
     } catch {
-      alert('Error al limpiar el historial de conflictos');
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo limpiar el historial.', background: '#0f172a', color: '#f8fafc' });
     } finally {
       setClearing(false);
     }
   };
 
-
   useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
   useEffect(() => { fetchConflictos(); }, [fetchConflictos]);
 
-  /* ── Listas únicas para los selects de filtro ─────────────────────── */
-  const uniqueDocentes = Array.from(
-    new Map(
-      horarios
-        .filter(h => h.asignacion?.docente)
-        .map(h => {
-          const d = h.asignacion!.docente!;
-          const label = d.user ? `${d.user.nombre} ${d.user.apellido}` : d.codigo_docente;
-          return [d.codigo_docente, label];
-        })
-    ).entries()
-  ).sort((a, b) => a[1].localeCompare(b[1]));
+  /* ── Listas para filtros ── */
+  const uniqueDocentes = Array.from(new Map(horarios.filter(h => h.asignacion?.docente).map(h => {
+    const d = h.asignacion!.docente!;
+    return [d.codigo_docente, d.user ? `${d.user.nombre} ${d.user.apellido}` : d.codigo_docente];
+  })).entries()).sort((a,b) => a[1].localeCompare(b[1]));
 
-  const uniqueAulas = Array.from(
-    new Map(
-      horarios
-        .filter(h => h.aula)
-        .map(h => [h.aula!.codigo_aula, h.aula!.nombre])
-    ).entries()
-  ).sort((a, b) => a[1].localeCompare(b[1]));
+  const uniqueAulas = Array.from(new Map(horarios.filter(h => h.aula).map(h => [h.aula!.codigo_aula, h.aula!.nombre])).entries()).sort((a,b) => a[1].localeCompare(b[1]));
+  const uniqueGrupos = Array.from(new Map(horarios.filter(h => h.asignacion?.grupo).map(h => [h.asignacion!.grupo!.codigo_grupo, h.asignacion!.grupo!.nombre])).entries()).sort((a,b) => a[1].localeCompare(b[1]));
+  const uniqueMaterias = Array.from(new Map(horarios.filter(h => h.asignacion?.materia).map(h => [h.asignacion!.materia!.codigo_materia, h.asignacion!.materia!.nombre])).entries()).sort((a,b) => a[1].localeCompare(b[1]));
+  const uniqueDepartamentos = Array.from(new Set(horarios.map(h => h.asignacion?.docente?.departamento).filter((d): d is string => !!d))).sort();
 
-  const uniqueGrupos = Array.from(
-    new Map(
-      horarios
-        .filter(h => h.asignacion?.grupo)
-        .map(h => [
-          h.asignacion!.grupo!.codigo_grupo,
-          h.asignacion!.grupo!.nombre,
-        ])
-    ).entries()
-  ).sort((a, b) => a[1].localeCompare(b[1]));
-
-  const uniqueMaterias = Array.from(
-    new Map(
-      horarios
-        .filter(h => h.asignacion?.materia)
-        .map(h => [
-          h.asignacion!.materia!.codigo_materia,
-          h.asignacion!.materia!.nombre,
-        ])
-    ).entries()
-  ).sort((a, b) => a[1].localeCompare(b[1]));
-
-  const uniqueDepartamentos = Array.from(
-    new Set(
-      horarios
-        .map(h => h.asignacion?.docente?.departamento)
-        .filter((d): d is string => !!d)
-    )
-  ).sort((a, b) => a.localeCompare(b));
-
-  /* ── Horarios filtrados (ciclo + docente + aula + grupo + materia + departamento) ── */
   const horariosFiltrados = horarios.filter(h => {
     if (cicloInput && !h.asignacion?.ciclo_escolar?.toLowerCase().includes(cicloInput.toLowerCase())) return false;
     if (filterDocente && h.asignacion?.docente?.codigo_docente !== filterDocente) return false;
@@ -294,424 +251,333 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
     return true;
   });
 
-  /* ── Construir mapa del grid: dia → hora → horarios ──────────────── */
-  const gridMap = new Map<string, Map<number, HorarioResponse[]>>();
+  /* ── Construcción del Grid Map con rowSpan ──────────────────────────
+     Estructura: dia → hora → lista de { horario, rowSpan, isStart, blocked }
+     - isStart=true  → se renderiza la celda (con rowSpan indicado)
+     - isStart=false → esa hora está "bloqueada" por una celda anterior (no se renderiza)
+  ── */
+  interface GridCell { horario: HorarioResponse; rowSpan: number; isStart: boolean; }
+
+  // Para cada día, mapeamos hora → lista de celdas
+  const gridMap = new Map<string, Map<number, GridCell[]>>();
   DAYS.forEach(({ value }) => gridMap.set(value, new Map()));
 
-  horariosFiltrados.filter((h) => h.activo).forEach((h) => {
-    const dayMap = gridMap.get(h.dia_semana);
-    if (!dayMap) return;
-    const startH = timeToHour(h.hora_inicio);
-    const endH = timeToHour(h.hora_fin);
-    for (let hh = startH; hh < endH; hh++) {
-      const key = hh;
-      if (!dayMap.has(key)) dayMap.set(key, []);
-      dayMap.get(key)!.push(h);
+  // Rastreamos qué celdas están bloqueadas (hora ya cubierta por un rowSpan anterior)
+  // blocked: dia → hora → Set de horario_ids ya pintados
+  const blocked = new Map<string, Map<number, Set<number>>>();
+  DAYS.forEach(({ value }) => blocked.set(value, new Map()));
+
+  horariosFiltrados.filter(h => h.activo).forEach(h => {
+    const dayMap   = gridMap.get(h.dia_semana)!;
+    const blockMap = blocked.get(h.dia_semana)!;
+    const startH   = timeToHour(h.hora_inicio);
+    const endH     = timeToHour(h.hora_fin);
+    const span     = Math.max(1, endH - startH);
+
+    // Registrar la celda de inicio (rowSpan real)
+    if (!dayMap.has(startH)) dayMap.set(startH, []);
+    dayMap.get(startH)!.push({ horario: h, rowSpan: span, isStart: true });
+
+    // Marcar las horas siguientes como bloqueadas
+    for (let hh = startH + 1; hh < endH; hh++) {
+      if (!blockMap.has(hh)) blockMap.set(hh, new Set());
+      blockMap.get(hh)!.add(h.id);
     }
   });
 
-  /* ── Vista lista (tabla simple) ───────────────────────────────────── */
+  /* ── Renderizado: Vista Listado ── */
   const renderList = () => (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-x-auto">
-      <table className="w-full text-xs sm:text-sm border-collapse min-w-max">
-        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-          <tr>
-            <th className="text-left px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Día</th>
-            <th className="text-left px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Hora</th>
-            <th className="text-left px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px] hidden sm:table-cell">Materia</th>
-            <th className="text-left px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px] hidden md:table-cell">Grupo</th>
-            <th className="text-left px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px] hidden lg:table-cell">Docente</th>
-            <th className="text-left px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Aula</th>
-            <th className="text-center px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Tipo</th>
-            <th className="text-center px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Versión</th>
-            <th className="text-center px-4 sm:px-5 py-3.5 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Acciones</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {horariosFiltrados.length === 0 ? (
-            <tr>
-              <td colSpan={9} className="text-center py-12 sm:py-16 text-gray-400 px-4">
-                <p className="text-sm">📭 No hay horarios que coincidan con los filtros</p>
-              </td>
+    <div className="bg-[#0a1532]/40 backdrop-blur-xl border border-white/5 rounded-[2rem] shadow-2xl overflow-hidden mt-6 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-white/[0.02] border-b border-white/5">
+              <th className="text-left px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Agenda / Ciclo</th>
+              <th className="text-left px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Horario Académico</th>
+              <th className="text-left px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Materia / Grupo</th>
+              <th className="text-left px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Docente Asignado</th>
+              <th className="text-left px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Espacio Físico</th>
+              <th className="text-center px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Histórico</th>
+              <th className="text-center px-6 py-5 font-black text-white/30 uppercase tracking-[0.2em] text-[10px]">Acciones</th>
             </tr>
-          ) : (
-            [...horariosFiltrados].sort((a, b) => {
-              const di = DAYS.findIndex(d => d.value === a.dia_semana) - DAYS.findIndex(d => d.value === b.dia_semana);
-              return di !== 0 ? di : a.hora_inicio.localeCompare(b.hora_inicio);
-            }).map((h) => (
-              <tr key={h.id}
-                onClick={() => setDetailId(h.id)}
-                className={`group hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition duration-200 border-l-4 border-transparent group-hover:border-blue-500 ${!h.activo ? 'opacity-50 bg-gray-50' : 'hover:shadow-md'}`}>
-                <td className="px-4 sm:px-5 py-3.5 capitalize text-gray-800 font-semibold text-xs sm:text-sm group-hover:text-blue-700 transition">{h.dia_semana}</td>
-                <td className="px-4 sm:px-5 py-3.5 text-gray-700 font-mono font-bold text-[11px] sm:text-xs whitespace-nowrap group-hover:text-blue-600">
-                  {h.hora_inicio.slice(0, 5)} – {h.hora_fin.slice(0, 5)}
-                </td>
-                <td className="px-4 sm:px-5 py-3.5 font-semibold text-gray-900 hidden sm:table-cell truncate group-hover:text-blue-800">
-                  {h.asignacion?.materia?.nombre ?? <span className="text-gray-400 font-normal">—</span>}
-                  {h.asignacion?.materia?.codigo_materia && (
-                    <span className="ml-1 text-xs text-gray-500 block sm:inline font-normal">({h.asignacion.materia.codigo_materia})</span>
-                  )}
-                </td>
-                <td className="px-4 sm:px-5 py-3.5 text-gray-800 hidden md:table-cell text-xs sm:text-sm font-medium group-hover:text-blue-700">{h.asignacion?.grupo?.nombre ?? '—'}</td>
-                <td className="px-4 sm:px-5 py-3.5 text-gray-700 text-xs hidden lg:table-cell font-medium group-hover:text-blue-600">
-                  {h.asignacion?.docente?.user
-                    ? `${h.asignacion.docente.user.nombre} ${h.asignacion.docente.user.apellido}`
-                    : h.asignacion?.docente?.codigo_docente ?? '—'}
-                </td>
-                <td className="px-4 sm:px-5 py-3.5 text-gray-700 text-[11px] sm:text-xs truncate font-medium group-hover:text-blue-600">{h.aula?.nombre ?? '—'}</td>
-                <td className="px-4 sm:px-5 py-3.5 text-center">
-                  <span className={`text-xs font-bold px-2 sm:px-2.5 py-1 rounded-lg whitespace-nowrap inline-block transition ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
-                    {TIPO_LABEL[h.tipo_sesion] ?? h.tipo_sesion}
-                  </span>
-                </td>
-                <td className="px-4 sm:px-5 py-3.5 text-center">
-                  {horarioVersiones[h.id] ? (
-                    <div className="space-y-1 flex flex-col items-center">
-                      <div className="inline-flex items-center justify-center w-7 h-7 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-full text-xs font-bold border border-purple-400 shadow-md group-hover:shadow-lg group-hover:scale-110 transition duration-200">
-                        v{horarioVersiones[h.id].version}
-                      </div>
-                      <p className="text-xs text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs group-hover:text-gray-800" title={horarioVersiones[h.id].cambios}>
-                        {horarioVersiones[h.id].cambios}
-                      </p>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {horariosFiltrados.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-20 opacity-20"><Bookmark size={48} className="mx-auto mb-4" /><p className="text-xs font-black uppercase tracking-widest">No se encontraron sesiones</p></td></tr>
+            ) : (
+              [...horariosFiltrados].sort((a,b) => {
+                const di = DAYS.findIndex(d => d.value === a.dia_semana) - DAYS.findIndex(d => d.value === b.dia_semana);
+                return di !== 0 ? di : a.hora_inicio.localeCompare(b.hora_inicio);
+              }).map((h) => (
+                <tr key={h.id} onClick={() => setDetailId(h.id)} className={`group hover:bg-white/[0.03] cursor-pointer transition-all duration-300 ${!h.activo ? 'opacity-40' : ''}`}>
+                  <td className="px-6 py-5">
+                    <div className="text-xs font-black text-white uppercase tracking-widest capitalize">{h.dia_semana}</div>
+                    <div className="text-[10px] text-white/30 font-bold mt-1 tracking-wider">{h.asignacion?.ciclo_escolar}</div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-2">
+                       <Clock size={12} className="text-blue-400 opacity-70" />
+                       <span className="text-sm font-black text-white font-mono tracking-tight">{h.hora_inicio.slice(0,5)} – {h.hora_fin.slice(0,5)}</span>
                     </div>
-                  ) : (
-                    <span className="text-xs text-gray-400 font-medium">—</span>
-                  )}
-                </td>
-                <td className="px-4 sm:px-5 py-3.5 text-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setVersionHistoryHorarioId(h.id);
-                      setShowVersionHistory(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:shadow-md hover:scale-105 active:scale-95 transition duration-200 text-xs font-bold"
-                    title="Ver histórico de cambios"
-                  >
-                    <History size={14} className="opacity-90" />
-                    Historial
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  /* ── Vista grid ───────────────────────────────────────────────────── */
-  const renderGrid = () => (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-x-auto">
-      <table className="text-xs border-collapse min-w-full sm:min-w-[700px]">
-        <thead>
-          <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-            <th className="px-3 sm:px-4 py-3.5 text-left font-bold text-gray-700 uppercase tracking-wider w-16 sm:w-20 sticky left-0 bg-gradient-to-r from-gray-50 to-gray-100 z-10 text-xs sm:text-sm">Hora</th>
-            {DAYS.map(({ label, value }) =>
-              (!filterDia || filterDia === value) ? (
-                <th key={value} className="px-2 sm:px-3 py-3.5 text-center font-bold text-gray-700 uppercase tracking-wider min-w-[100px] sm:min-w-[130px] text-xs sm:text-sm">
-                  <span className="hidden sm:inline">{label}</span>
-                  <span className="sm:hidden">{label.slice(0, 3)}</span>
-                </th>
-              ) : null
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="text-xs font-black text-white uppercase tracking-tight truncate max-w-[220px]">{h.asignacion?.materia?.nombre}</div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                       <span className="px-2 py-0.5 bg-white/5 rounded text-[9px] font-black text-white/40 uppercase tracking-widest border border-white/5">{h.asignacion?.grupo?.nombre}</span>
+                       <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${TIPO_COLORS[h.tipo_sesion] || 'bg-white/10 text-white/40 border-white/5'}`}>{TIPO_LABEL[h.tipo_sesion] || h.tipo_sesion}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="text-xs font-bold text-white/80">{h.asignacion?.docente?.user ? `${h.asignacion.docente.user.nombre} ${h.asignacion.docente.user.apellido}` : h.asignacion?.docente?.codigo_docente}</div>
+                    <div className="text-[10px] text-white/20 font-black uppercase tracking-widest truncate max-w-[150px] mt-0.5">{h.asignacion?.docente?.departamento || 'Sin Departamento'}</div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="text-xs font-black text-emerald-400/90">{h.aula?.nombre || '—'}</div>
+                    <div className="text-[10px] text-white/30 font-black uppercase tracking-widest">{h.aula?.codigo_aula}</div>
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    {horarioVersiones[h.id] ? (
+                      <div className="flex flex-col items-center gap-1 group/audit relative">
+                         <div className="w-7 h-7 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg">v{horarioVersiones[h.id].version}</div>
+                         <div className="text-[8px] text-white/20 font-bold max-w-[90px] truncate uppercase tracking-tighter" title={horarioVersiones[h.id].cambios}>{horarioVersiones[h.id].cambios}</div>
+                      </div>
+                    ) : <span className="text-white/5">—</span>}
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center justify-center gap-2">
+                       <button onClick={(e) => { e.stopPropagation(); setVersionHistoryHorarioId(h.id); setShowVersionHistory(true); }} className="p-2.5 bg-white/5 hover:bg-white/10 text-white/30 hover:text-white rounded-xl border border-white/10 transition-all active:scale-95" title="Auditoría de cambios"><History size={16} /></button>
+                       <button className="p-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/10 transition-all active:scale-95" title="Expediente de sesión"><Eye size={16} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {HOURS.map((hourStr, i) => {
-            const hourInt = parseInt(hourStr, 10);
-            return (
-              <tr key={hourStr} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 transition duration-200`}>
-                <td className="px-3 sm:px-4 py-2.5 sm:py-3 font-mono font-bold text-gray-700 text-[11px] sm:text-xs border-r-2 border-gray-200 sticky left-0 bg-gradient-to-r from-gray-50 to-white z-10 whitespace-nowrap">
-                  {hourStr}
-                </td>
-                {DAYS.map(({ value }) => {
-                  if (filterDia && filterDia !== value) return null;
-                  const cellItems = gridMap.get(value)?.get(hourInt) ?? [];
-                  return (
-                    <td key={value} className="px-1 sm:px-2 py-1.5 sm:py-2 border-r border-gray-100 align-top min-h-[32px] sm:min-h-[44px] bg-gradient-to-b from-transparent to-gray-50/30">
-                      {cellItems.length === 0 ? (
-                        <div className="text-gray-300 text-[10px] font-light italic">—</div>
-                      ) : (
-                        cellItems.map((h, idx) => (
-                          <div
-                            key={`${h.id}-${idx}`}
-                            onClick={() => setDetailId(h.id)}
-                            className={`rounded-lg border-2 px-1.5 sm:px-2 py-1 mb-1 leading-tight cursor-pointer transition-all duration-200 text-[10px] sm:text-xs font-medium group hover:shadow-md hover:scale-105 hover:z-20 transform ${TIPO_COLORS[h.tipo_sesion] ?? 'bg-gray-100 border-gray-300 text-gray-700'} ${!h.activo ? 'opacity-50 line-through' : ''}`}
-                            title={`${h.asignacion?.materia?.nombre ?? ''} · ${h.asignacion?.grupo?.nombre ?? ''} · ${h.aula?.nombre ?? ''}`}
-                          >
-                            <div className="font-bold truncate max-w-[85px] sm:max-w-[120px] group-hover:text-opacity-100">
-                              {h.asignacion?.materia?.nombre ?? 'Sin materia'}
-                            </div>
-                            <div className="text-[8px] sm:text-[10px] opacity-80 truncate max-w-[85px] sm:max-w-[120px] group-hover:opacity-100">
-                              {h.asignacion?.grupo?.codigo_grupo} · {h.aula?.codigo_aula ?? '—'}
-                            </div>
-                            {h.asignacion?.docente?.user && (
-                              <div className="text-[7px] sm:text-[9px] opacity-70 truncate max-w-[85px] sm:max-w-[120px] group-hover:opacity-90 font-normal">
-                                👤 {h.asignacion.docente.user.nombre} {h.asignacion.docente.user.apellido.charAt(0)}.
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 
-  /* ── UI ─────────────────────────────────────────────────────────── */
+  /* ── Renderizado: Vista Malla (con rowSpan por duración real) ── */
+  const renderGrid = () => (
+    <div className="bg-[#0a1532]/40 backdrop-blur-xl border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden mt-6 animate-in zoom-in-95 duration-500">
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="text-xs border-collapse min-w-full">
+          <thead>
+            <tr className="bg-white/[0.01] border-b border-white/5">
+              <th className="px-8 py-6 text-left font-black text-white/30 uppercase tracking-[0.25em] text-[10px] sticky left-0 bg-[#0a1532] z-20">Cronos</th>
+              {DAYS.map(({ label, value }) => (!filterDia || filterDia === value) && (
+                <th key={value} className="px-4 py-6 text-center font-black text-white uppercase tracking-[0.2em] text-[11px] min-w-[180px]">{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {HOURS.map((hourStr) => {
+              const hInt = parseInt(hourStr, 10);
+              return (
+                <tr key={hourStr} className="border-b border-white/5 hover:bg-white/[0.005]">
+                  {/* Columna de hora — altura fija de 80px por franja horaria */}
+                  <td
+                    className="px-8 font-mono font-black text-white/30 text-xs border-r border-white/5 sticky left-0 bg-[#0a1532]/95 backdrop-blur-md z-10 text-center whitespace-nowrap align-middle"
+                    style={{ height: '80px' }}
+                  >
+                    {hourStr}
+                  </td>
+
+                  {DAYS.map(({ value: dayVal }) => {
+                    if (filterDia && filterDia !== dayVal) return null;
+
+                    const blockMap   = blocked.get(dayVal)!;
+                    const dayMap     = gridMap.get(dayVal)!;
+                    const cells      = dayMap.get(hInt) ?? [];
+                    const blockedIds = blockMap.get(hInt) ?? new Set<number>();
+                    const startCells = cells.filter(c => c.isStart);
+
+                    // Si esta hora está cubierta por el rowSpan de una celda anterior,
+                    // NO renderizamos <td> — el navegador fusiona la celda automáticamente.
+                    if (startCells.length === 0 && blockedIds.size > 0) return null;
+
+                    return (
+                      // rowSpan nativo: 1h → 80px, 2h → 160px, etc.
+                      // El browser fusiona las filas; style height fuerza la expansión
+                      <td
+                        key={dayVal}
+                        rowSpan={startCells.length > 0 ? startCells[0].rowSpan : 1}
+                        className="px-2 border-r border-white/5 align-stretch"
+                        style={startCells.length > 0
+                          ? { height: `${startCells[0].rowSpan * 80}px`, verticalAlign: 'stretch', padding: '6px' }
+                          : { height: '80px' }}
+                      >
+                        {startCells.length === 0 ? null : (
+                          <div className="flex flex-col gap-1.5" style={{ height: '100%' }}>
+                            {startCells.map((cell) => (
+                              <div
+                                key={cell.horario.id}
+                                onClick={() => setDetailId(cell.horario.id)}
+                                style={{ flex: 1, minHeight: 0 }}
+                                className={`p-3 rounded-[1.5rem] border transition-all duration-300 cursor-pointer hover:scale-[1.01] active:scale-95 hover:shadow-2xl hover:z-30 relative flex flex-col justify-between overflow-hidden ${
+                                  TIPO_COLORS[cell.horario.tipo_sesion] || 'bg-white/5 border-white/10 text-white/60'
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-black text-[11px] uppercase tracking-tight leading-tight mb-1.5">
+                                    {cell.horario.asignacion?.materia?.nombre}
+                                  </div>
+                                  <div className="text-[9px] font-bold opacity-60 uppercase tracking-tighter">
+                                    {cell.horario.hora_inicio.slice(0,5)} – {cell.horario.hora_fin.slice(0,5)}
+                                  </div>
+                                  {cell.horario.asignacion?.docente && (
+                                    <div className="text-[9px] font-bold opacity-70 mt-1 truncate">
+                                      {cell.horario.asignacion.docente.user
+                                        ? `${cell.horario.asignacion.docente.user.nombre} ${cell.horario.asignacion.docente.user.apellido}`
+                                        : cell.horario.asignacion.docente.codigo_docente}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between text-[9px] font-black opacity-40 uppercase tracking-tighter mt-1">
+                                  <span className="truncate max-w-[65px]">{cell.horario.asignacion?.grupo?.codigo_grupo}</span>
+                                  <span className="truncate max-w-[65px] text-right">{cell.horario.aula?.codigo_aula}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  /* ── UI Principal ── */
+  const inputClass = "w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold shadow-inner";
+  const labelClass = "text-[10px] font-black text-white/25 uppercase tracking-[0.3em] mb-2.5 ms-2 block";
+
   return (
-    <div className="p-4 sm:p-6 h-full overflow-auto bg-gradient-to-b from-gray-50 via-white to-gray-50">
-      {/* Header */}
-      <div className="space-y-5 sm:space-y-6 mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 transition">
-              <Calendar className="text-white" size={24} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Horarios</h1>
-              <p className="text-gray-500 text-xs sm:text-sm mt-1 font-medium">📅 {horarios.length} sesiones registradas</p>
-            </div>
-          </div>
-          <div className="flex gap-2.5 items-center flex-wrap sm:flex-nowrap">
-            <button onClick={fetchHorarios}
-              className="p-2.5 border border-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 hover:shadow-md transition duration-200 shrink-0 group" title="Actualizar">
-              <RefreshCw size={16} className={`${loading ? 'animate-spin text-blue-600' : 'text-gray-500 group-hover:text-blue-600'} w-5 h-5 transition`} />
-            </button>
-            <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 border-2 border-gray-200 rounded-lg text-xs sm:text-sm hover:bg-indigo-50 hover:border-indigo-300 hover:shadow-md transition duration-200 text-gray-700 font-bold group">
-              {viewMode === 'grid' ? (
-                <>
-                  <List size={16} className="group-hover:scale-110 transition-transform" />
-                  <span className="hidden sm:inline">Vista Lista</span>
-                  <span className="sm:hidden">Lista</span>
-                </>
-              ) : (
-                <>
-                  <Grid size={16} className="group-hover:scale-110 transition-transform" />
-                  <span className="hidden sm:inline">Vista Grid</span>
-                  <span className="sm:hidden">Grid</span>
-                </>
-              )}
-            </button>
-            <button onClick={() => setShowConflictosModal(true)}
-              className="relative inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 border-2 border-red-300 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 hover:border-red-400 hover:shadow-md font-bold transition duration-200 text-xs sm:text-sm group">
-              <AlertTriangle size={16} className="group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">Conflictos</span>
-              <span className="sm:hidden">Conf.</span>
-              {conflictos.filter(c => !c.resuelto).length > 0 && (
-                <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {conflictos.filter(c => !c.resuelto).length}
-                </span>
-              )}
-            </button>
-            <button onClick={onAssignClick}
-              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:shadow-lg hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 font-bold transition duration-200 text-xs sm:text-sm group transform">
-              <Plus size={16} className="group-hover:scale-110 transition-transform" /> 
-              <span className="hidden sm:inline">Nuevo horario</span>
-              <span className="sm:hidden">+Horario</span>
-            </button>
-          </div>
+    <div className="p-6 h-full overflow-auto bg-[#081028] text-white custom-scrollbar animate-in fade-in duration-500">
+      
+      {/* Dynamic Navigation Header */}
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-10 mb-12">
+        <div className="flex items-center gap-8">
+           <div className="w-16 h-16 bg-blue-600/10 rounded-[1.8rem] border border-blue-500/20 shadow-[0_0_30px_rgba(37,99,235,0.1)] flex items-center justify-center group overflow-hidden relative">
+              <div className="absolute inset-0 bg-blue-500/5 scale-0 group-hover:scale-100 transition-transform duration-700"></div>
+              <Calendar size={32} className="text-blue-500 group-hover:scale-110 transition-transform relative z-10" strokeWidth={2.5} />
+           </div>
+           <div>
+              <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none mb-3">Gestión de Horarios</h1>
+              <div className="flex items-center gap-5">
+                 <div className="flex items-center gap-2.5 group cursor-pointer" onClick={fetchHorarios}>
+                    <RefreshCw size={15} className={`${loading ? 'animate-spin' : ''} text-blue-400/60 group-hover:text-blue-300 transition-colors`} />
+                    <span className="text-[11px] font-black text-blue-400/60 uppercase tracking-widest group-hover:text-blue-300">Sincronizar Panel</span>
+                 </div>
+                 <span className="w-1.5 h-1.5 rounded-full bg-white/5"></span>
+                 <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.25em]">{horarios.length} Sesiones Detectadas</p>
+              </div>
+           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-md space-y-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Filter size={16} className="text-blue-600" />
-            </div>
-            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Filtros avanzados</h3>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {/* Ciclo */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Ciclo</label>
-              <input
-                type="text"
-                value={cicloInput}
-                onChange={(e) => setCicloInput(e.target.value)}
-                placeholder="Ej: 2026-1"
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200"
-              />
-            </div>
-
-            {/* Día */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Día</label>
-              <select
-                value={filterDia}
-                onChange={(e) => setFilterDia(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200 bg-white"
-              >
-                <option value="">Todos los días</option>
-                {DAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
-            </div>
-
-            {/* Docente */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Docente</label>
-              <select
-                value={filterDocente}
-                onChange={(e) => setFilterDocente(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200 bg-white"
-              >
-                <option value="">Todos los docentes</option>
-                {uniqueDocentes.map(([codigo, nombre]) => (
-                  <option key={codigo} value={codigo}>{nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Aula */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Aula</label>
-              <select
-                value={filterAula}
-                onChange={(e) => setFilterAula(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200 bg-white"
-              >
-                <option value="">Todas las aulas</option>
-                {uniqueAulas.map(([codigo, nombre]) => (
-                  <option key={codigo} value={codigo}>{nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Grupo */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Grupo</label>
-              <select
-                value={filterGrupo}
-                onChange={(e) => setFilterGrupo(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200 bg-white"
-              >
-                <option value="">Todos los grupos</option>
-                {uniqueGrupos.map(([codigo, nombre]) => (
-                  <option key={codigo} value={codigo}>{nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Materia */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Materia</label>
-              <select
-                value={filterMateria}
-                onChange={(e) => setFilterMateria(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200 bg-white"
-              >
-                <option value="">Todas las materias</option>
-                {uniqueMaterias.map(([codigo, nombre]) => (
-                  <option key={codigo} value={codigo}>{nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Departamento */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider block">Departamento</label>
-              <select
-                value={filterDepartamento}
-                onChange={(e) => setFilterDepartamento(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition duration-200 bg-white"
-              >
-                <option value="">Todos los departamentos</option>
-                {uniqueDepartamentos.map((dep) => (
-                  <option key={dep} value={dep}>{dep}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Botón limpiar filtros (solo si hay alguno activo) */}
-          {(filterDia || cicloInput || filterDocente || filterAula || filterGrupo || filterMateria || filterDepartamento) && (
-            <button
-              onClick={() => {
-                setFilterDia('');
-                setCicloInput('');
-                setFilterDocente('');
-                setFilterAula('');
-                setFilterGrupo('');
-                setFilterMateria('');
-                setFilterDepartamento('');
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-3.5 py-2 rounded-lg transition duration-200 border border-orange-200 hover:border-orange-300"
-              title="Limpiar todos los filtros"
-            >
-              <X size={14} />
-              Limpiar filtros
-            </button>
-          )}
+        <div className="flex flex-wrap items-center gap-4 bg-white/5 p-2.5 rounded-[2.2rem] border border-white/5 shadow-2xl backdrop-blur-md">
+          <button onClick={() => setViewMode('grid')} className={`px-7 py-3.5 rounded-[1.4rem] flex items-center gap-3 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'grid' ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'text-white/35 hover:text-white hover:bg-white/10'}`}>
+            <Grid size={18} strokeWidth={2.5} /> Malla
+          </button>
+          <button onClick={() => setViewMode('list')} className={`px-7 py-3.5 rounded-[1.4rem] flex items-center gap-3 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'text-white/35 hover:text-white hover:bg-white/10'}`}>
+            <List size={18} strokeWidth={2.5} /> Listado
+          </button>
+          <div className="w-px h-10 bg-white/10 mx-2 hidden sm:block"></div>
+          <button onClick={() => setShowConflictosModal(true)} className="px-7 py-3.5 rounded-[1.4rem] flex items-center gap-3 text-xs font-black uppercase tracking-widest bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-all border border-red-500/10 relative group">
+            <AlertTriangle size={18} className="group-hover:animate-bounce" /> Conflictos
+            {conflictos.filter(c => !c.resuelto).length > 0 && <span className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse border-2 border-[#0a1532]">{conflictos.filter(c => !c.resuelto).length}</span>}
+          </button>
+          <button onClick={onAssignClick} className="px-8 py-3.5 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-[1.4rem] font-black uppercase tracking-widest text-xs hover:shadow-[0_0_25px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-3">
+            <Plus size={20} strokeWidth={3} /> Nueva Sesión
+          </button>
         </div>
       </div>
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="bg-red-50 border-2 border-red-300 text-red-800 rounded-lg px-4 sm:px-5 py-3 text-xs sm:text-sm mb-4 font-medium flex items-start gap-2">
-          <AlertCircle size={16} className="shrink-0 mt-0.5" />
-          <span>{error}</span>
+      {/* Advanced Filter Suite */}
+      <div className="bg-[#0a1532]/60 backdrop-blur-2xl border border-white/5 rounded-[3rem] p-10 shadow-2xl mb-12 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full -mr-48 -mt-48 blur-[100px] opacity-40 group-hover:opacity-70 transition-opacity duration-1000"></div>
+        <div className="flex items-center gap-4 mb-10 relative z-10">
+           <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20 shadow-inner"><Filter size={20} className="text-blue-500" /></div>
+           <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.45em]">Módulo de Filtrado Estratégico</h3>
         </div>
-      )}
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8 relative z-10">
+            {[ 
+              { label: 'Ciclo', value: cicloInput, setter: setCicloInput, placeholder: '2026-X', type: 'input' },
+              { label: 'Día', value: filterDia, setter: setFilterDia, options: DAYS, type: 'select' },
+              { label: 'Docente', value: filterDocente, setter: setFilterDocente, map: uniqueDocentes, type: 'select' },
+              { label: 'Aula', value: filterAula, setter: setFilterAula, map: uniqueAulas, type: 'select' },
+              { label: 'Grupo', value: filterGrupo, setter: setFilterGrupo, map: uniqueGrupos, type: 'select' },
+              { label: 'Materia', value: filterMateria, setter: setFilterMateria, map: uniqueMaterias, type: 'select' },
+              { label: 'Departamento', value: filterDepartamento, setter: setFilterDepartamento, options: uniqueDepartamentos, type: 'select' }
+            ].map((f, i) => (
+              <div key={i}>
+                <label className={labelClass}>{f.label}</label>
+                {f.type === 'input' ? (
+                  <input type="text" value={f.value} onChange={e => f.setter(e.target.value)} placeholder={f.placeholder} className={inputClass} />
+                ) : (
+                  <select value={f.value} onChange={e => f.setter(e.target.value)} className={inputClass}>
+                    <option value="" className="bg-[#0f172a]">Todos</option>
+                    {f.options?.map((o: any) => typeof o === 'string' ? <option key={o} value={o} className="bg-[#0f172a]">{o}</option> : <option key={o.value} value={o.value} className="bg-[#0f172a]">{o.label}</option>)}
+                    {f.map?.map(([c, n]) => <option key={c} value={c} className="bg-[#0f172a]">{n}</option>)}
+                  </select>
+                )}
+              </div>
+            ))}
+        </div>
+        {(filterDia || cicloInput || filterDocente || filterAula || filterGrupo || filterMateria || filterDepartamento) && (
+          <button onClick={() => { setFilterDia(''); setCicloInput(''); setFilterDocente(''); setFilterAula(''); setFilterGrupo(''); setFilterMateria(''); setFilterDepartamento(''); }} className="mt-10 text-[11px] font-black uppercase tracking-widest text-white/20 hover:text-orange-400 transition-all flex items-center gap-3 ms-2 relative z-10 group"><X size={16} className="group-hover:rotate-90 transition-transform duration-500" /> Reiniciar configuración de filtrado</button>
+        )}
+      </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-20 space-y-4">
-          <div className="relative w-12 h-12">
-            <RefreshCw size={40} className="animate-spin text-blue-600" />
+      {/* Main Content Render */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-40 space-y-10 animate-pulse">
+          <div className="p-10 bg-blue-500/10 rounded-[3.5rem] border border-blue-500/20 shadow-[0_0_50px_rgba(37,99,235,0.1)] relative overflow-hidden group">
+             <RefreshCw size={64} className="animate-spin text-blue-500/80" />
+             <div className="absolute inset-0 bg-blue-500/5 blur-[40px]"></div>
           </div>
           <div className="text-center">
-            <p className="text-gray-700 font-semibold">Cargando horarios...</p>
-            <p className="text-xs text-gray-500 mt-1">Por favor espere</p>
+            <h3 className="text-2xl font-black uppercase tracking-tight text-white/90 mb-3">Sincronizando Módulo</h3>
+            <p className="text-[11px] font-black uppercase tracking-widest text-white/15">Sincronizando con el servidor central y registros de auditoría...</p>
           </div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-500/5 border border-red-500/20 text-red-500 rounded-[3.5rem] p-16 text-center max-w-2xl mx-auto shadow-[0_0_60px_rgba(239,68,68,0.05)] animate-in zoom-in-95 backdrop-blur-md">
+          <AlertCircle size={56} className="mx-auto mb-8 text-red-600/60" />
+          <p className="font-black text-2xl uppercase tracking-tighter mb-4">Error de Integridad</p>
+          <p className="text-sm opacity-40 leading-relaxed font-bold mb-10 max-w-md mx-auto">{error}</p>
+          <button onClick={fetchHorarios} className="px-10 py-4 bg-red-600 hover:bg-red-500 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-red-900/20">Reintentar Conexión</button>
+        </div>
+      ) : (
+        <div className="animate-in fade-in duration-700">
+           {viewMode === 'grid' ? renderGrid() : renderList()}
         </div>
       )}
 
-      {!loading && !error && (
-        <div className="flex gap-4 items-start">
-          {/* ── Tabla principal ── */}
-          <div className="flex-1 min-w-0">
-            {viewMode === 'grid' ? renderGrid() : renderList()}
-          </div>
-        </div>
-      )}
+      {/* Professional Aesthetics Inject */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { height: 10px; width: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius: 30px; border: 3px solid transparent; background-clip: content-box; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,0.25); background-clip: content-box; }
+      `}</style>
 
-      {/* Modal de detalle de horario */}
-      <HorarioDetailModal
-        horarioId={detailId}
-        onClose={() => setDetailId(null)}
-        onSaved={() => { setDetailId(null); fetchHorarios(); }}
-      />
-
-      {/* Modal de histórico de versiones */}
-      <VersionHistoryModal
-        horarioId={versionHistoryHorarioId || 0}
-        isOpen={showVersionHistory}
-        onClose={() => setShowVersionHistory(false)}
-      />
-
-      {/* Modal de conflictos */}
+      {/* Modals & Portals */}
+      <HorarioDetailModal horarioId={detailId} onClose={() => setDetailId(null)} onSaved={() => { setDetailId(null); fetchHorarios(); }} />
+      <VersionHistoryModal horarioId={versionHistoryHorarioId || 0} isOpen={showVersionHistory} onClose={() => setShowVersionHistory(false)} />
       <ConflictosModal
-        isOpen={showConflictosModal}
-        onClose={() => setShowConflictosModal(false)}
-        conflictos={conflictos}
-        loading={loadingConf}
-        clearing={clearing}
-        onRefresh={fetchConflictos}
-        onResolve={resolveConflict}
-        onClearResolved={() => clearConflicts(false)}
-        onClearAll={() => clearConflicts(true)}
+        isOpen={showConflictosModal} onClose={() => setShowConflictosModal(false)}
+        conflictos={conflictos} loading={loadingConf} clearing={clearing}
+        onRefresh={fetchConflictos} onResolve={resolveConflict}
+        onClearResolved={() => clearConflicts(false)} onClearAll={() => clearConflicts(true)}
         onViewHorario={(id) => setDetailId(id)}
       />
-
     </div>
   );
 }
