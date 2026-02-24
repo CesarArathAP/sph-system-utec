@@ -161,7 +161,94 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
           </div>
 
           {/* ── Body ── */}
-          <div className="overflow-y-auto flex-1 p-6">
+          <div className="overflow-y-auto flex-1 p-6 space-y-6">
+
+            {/* Información del Docente */}
+            {!loading && docente && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Tarjeta 1: Datos Personales */}
+                <div className="bg-white/10 border border-white/20 rounded-xl p-4 space-y-3">
+                  <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider">Datos Personales</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-white/50 text-xs uppercase tracking-wide font-semibold mb-1">Nombre completo</p>
+                      <p className="text-white font-semibold text-sm">
+                        {docente.user?.nombre} {docente.user?.apellido}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-white/50 text-xs uppercase tracking-wide font-semibold mb-1">Código docente</p>
+                      <p className="text-blue-300 font-mono text-sm">{docente.codigo_docente}</p>
+                    </div>
+                    <div>
+                      <p className="text-white/50 text-xs uppercase tracking-wide font-semibold mb-1">Departamento</p>
+                      <p className="text-white/80 text-sm">{docente.departamento ?? 'Sin asignar'}</p>
+                    </div>
+                    {docente.user?.email && (
+                      <div>
+                        <p className="text-white/50 text-xs uppercase tracking-wide font-semibold mb-1">Email</p>
+                        <p className="text-blue-200 text-sm break-all">{docente.user.email}</p>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-white/10">
+                      <p className="text-white/50 text-xs uppercase tracking-wide font-semibold mb-2">Estado</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full transition-all ${docente.activo ? 'bg-emerald-400 shadow-lg shadow-emerald-500/50' : 'bg-red-400 shadow-lg shadow-red-500/50'}`}></span>
+                        <span className={`text-sm font-semibold ${docente.activo ? 'text-emerald-300' : 'text-red-300'}`}>
+                          {docente.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta 2: Carga Horaria */}
+                {tieneHorarios && (
+                  <div className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-400/30 rounded-xl p-4 space-y-4">
+                    <h3 className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Carga Horaria</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-emerald-100 text-sm font-semibold">Horas por semana</p>
+                          <p className="text-emerald-300 font-bold text-lg">
+                            {horasTotales.toFixed(1)}h
+                            <span className="text-emerald-200/60 text-xs font-normal ml-1">/ {maxHoras}h</span>
+                          </p>
+                        </div>
+                        <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden border border-emerald-400/20">
+                          <div 
+                            className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full transition-all duration-300 shadow-lg shadow-emerald-500/50" 
+                            style={{ width: `${pct}%` }} 
+                          />
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-emerald-400/20">
+                        <p className="text-emerald-200 text-xs">
+                          {pct >= 100 ? '✓ Carga completa' : `${(100 - pct).toFixed(0)}% disponible`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tarjeta Si no tiene horarios */}
+                {!tieneHorarios && !error && (
+                  <div className="bg-amber-500/20 border border-amber-400/30 rounded-xl p-4 space-y-3">
+                    <h3 className="text-amber-100 text-xs font-bold uppercase tracking-wider">Estado</h3>
+                    <p className="text-amber-100 text-sm">
+                      Sin horarios asignados aún
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Separador visual */}
+            {!loading && docente && tieneHorarios && (
+              <div className="border-t border-white/10 pt-4">
+                <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider mb-4">Horarios de la semana</h3>
+              </div>
+            )}
 
             {/* Loading */}
             {loading && (
@@ -180,14 +267,14 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
 
             {/* Sin horarios */}
             {!loading && !error && !tieneHorarios && (
-              <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+              <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
                   <Calendar size={32} className="text-white/20" />
                 </div>
                 <div>
                   <p className="text-white/70 font-semibold">Sin horarios asignados</p>
                   <p className="text-white/35 text-xs mt-1 max-w-xs">
-                    Este docente no tiene sesiones programadas. Agrega horarios desde el módulo de Asignaciones.
+                    Agrega horarios desde el módulo de Asignaciones.
                   </p>
                 </div>
               </div>
