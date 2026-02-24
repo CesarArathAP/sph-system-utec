@@ -91,7 +91,22 @@ def _docente_disponible(db: Session, docente_id: int,
 
     Lógica idéntica a horario_service.check_docente_disponibilidad, pero devuelve
     bool en lugar de lanzar HTTPException (para poder usarla en bucles).
+    
+    IMPORTANTE: Si el docente TIENE ALGÚN registro de disponibilidad, solo está
+    disponible en esos rangos. Si NO tiene ningún registro, está disponible siempre.
     """
+    # Primero: verificar si el docente tiene ALGÚN registro de disponibilidad
+    total_disponibilidad = (
+        db.query(DisponibilidadDocente)
+        .filter(DisponibilidadDocente.docente_id == docente_id)
+        .count()
+    )
+    
+    # Si NO tiene ningún registro de disponibilidad, disponible siempre
+    if total_disponibilidad == 0:
+        return True
+    
+    # Si TIENE registros, buscar específicamente para ese día
     slots = (
         db.query(DisponibilidadDocente)
         .filter(
@@ -102,9 +117,9 @@ def _docente_disponible(db: Session, docente_id: int,
         .all()
     )
 
-    # Sin registros → disponible siempre (misma regla que el service)
+    # Si TIENE registros de disponibilidad pero NINGUNO para este día, NO disponible
     if not slots:
-        return True
+        return False
 
     # El bloque debe quedar completamente cubierto por la unión continua de slots
     cursor = None

@@ -234,13 +234,26 @@ def check_docente_disponibilidad(
     Verifica que el docente tenga disponibilidad registrada que cubra
     completamente el bloque [hora_inicio, hora_fin) del día dado.
 
-    Si el docente no tiene disponibilidad registrada en absoluto se permite
-    (no se bloquea, sólo se valida cuando hay registros de disponibilidad).
+    Si el docente tiene CUALQUIER registro de disponibilidad, entonces solo
+    puede enseñar en los rangos registrados. Si NO tiene ningún registro,
+    se asume que está disponible siempre.
 
     Raises:
         HTTPException 422 con mensaje descriptivo y los slots disponibles
         del docente en ese día si el bloque solicitado no está cubierto.
     """
+    # Primero: verificar si el docente tiene ALGÚN registro de disponibilidad
+    total_disponibilidad = (
+        db.query(DisponibilidadDocente)
+        .filter(DisponibilidadDocente.docente_id == docente_id)
+        .count()
+    )
+    
+    # Si NO tiene ningún registro de disponibilidad, permitir (estaba disponible siempre)
+    if total_disponibilidad == 0:
+        return
+    
+    # Si TIENE registros, buscar específicamente para ese día
     slots_dia = (
         db.query(DisponibilidadDocente)
         .join(Docente, DisponibilidadDocente.docente_id == Docente.id)
@@ -252,9 +265,43 @@ def check_docente_disponibilidad(
         .all()
     )
 
-    # Si no hay disponibilidad registrada para ese día, dejar pasar
+    # Si TIENE registros de disponibilidad pero NINGUNO para este día, bloquear
     if not slots_dia:
-        return
+        docente = db.query(Docente).filter(Docente.id == docente_id).first()
+        docente_nombre = "el docente"
+        if docente and docente.user:
+            docente_nombre = f"{docente.user.nombre} {docente.user.apellido}"
+        
+        dia_legible = DIAS_ES.get(dia_semana, dia_semana)
+        
+        # Obtener qué días SÍ tiene disponibilidad
+        dias_con_disponibilidad = (
+            db.query(DisponibilidadDocente.dia_semana)
+            .filter(DisponibilidadDocente.docente_id == docente_id)
+            .distinct()
+            .all()
+        )
+        dias_disponibles = ", ".join(DIAS_ES.get(d[0], d[0]) for d in dias_con_disponibilidad) if dias_con_disponibilidad else "ninguno"
+        
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "mensaje": (
+                    f"No se puede asignar horario: {docente_nombre} no tiene disponibilidad "
+                    f"registrada el {dia_legible}."
+                ),
+                "disponibilidad_docente": {
+                    "dia": dia_legible,
+                    "dias_disponibles": dias_disponibles,
+                    "sugerencia": (
+                        f"{docente_nombre} solo tiene disponibilidad los siguientes días: {dias_disponibles}. "
+                        f"Intenta cambiar el día de la clase o actualiza la disponibilidad del docente."
+                    ),
+                },
+            },
+        )
+    
+    # El docente SÍ tiene disponibilidad para este día, verificar que el slot esté cubierto
 
     # Obtener datos del docente para el mensaje
     docente = db.query(Docente).filter(Docente.id == docente_id).first()

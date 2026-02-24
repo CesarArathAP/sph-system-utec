@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, RefreshCw, AlertTriangle, CheckCircle, Filter, Plus, Eye, History, List, Grid, AlertCircle, X, Clock, Bookmark, Search } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { useToast } from '../../common/Toast';
 import { API_CONFIG } from '../../../services/config';
 import HorarioDetailModal from './HorarioDetailModal';
 import VersionHistoryModal from './VersionHistoryModal';
@@ -73,6 +73,7 @@ interface ScheduleTableProps {
 }
 
 export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: ScheduleTableProps) {
+  const { addToast } = useToast();
   const [horarios, setHorarios] = useState<HorarioResponse[]>([]);
   const [conflictos, setConflictos] = useState<ConflictoRegistrado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,31 +185,27 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       });
       if (res.ok) {
         fetchConflictos();
-        Swal.fire({
-          icon: 'success', title: 'Resuelto', text: 'El conflicto ha sido marcado como resuelto.',
-          toast: true, position: 'top-end', timer: 2500, showConfirmButton: false, background: '#0f172a', color: '#f8fafc'
+        addToast({
+          type: 'success', 
+          title: 'Resuelto', 
+          message: 'El conflicto ha sido marcado como resuelto.',
+          duration: 3000
         });
       }
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo resolver el conflicto.', background: '#0f172a', color: '#f8fafc' });
+      addToast({ 
+        type: 'error', 
+        title: 'Error', 
+        message: 'No se pudo resolver el conflicto.',
+        duration: 3000
+      });
     }
   };
 
   const clearConflicts = async (todos = false) => {
-    const result = await Swal.fire({
-      title: todos ? '¿Limpiar Todo el Historial?' : '¿Limpiar Conflictos Resueltos?',
-      text: todos ? 'Esta acción borrará todos los registros de conflictos permanentemente.' : 'Se eliminarán únicamente los conflictos ya resueltos.',
-      icon: 'warning',
-      showCancelButton: true,
-      background: '#0f172a', color: '#f8fafc',
-      confirmButtonColor: todos ? '#ef4444' : '#10b981',
-      cancelButtonColor: '#475569',
-      confirmButtonText: todos ? 'Sí, borrar todo' : 'Sí, limpiar resueltos',
-      cancelButtonText: 'Cancelar',
-      customClass: { popup: 'rounded-3xl border border-white/10 shadow-2xl backdrop-blur-xl' }
-    });
+    const result = confirm(todos ? '¿Está seguro que desea borrar todo el historial de conflictos?' : '¿Está seguro que desea limpiar los conflictos resueltos?');
 
-    if (!result.isConfirmed) return;
+    if (!result) return;
 
     setClearing(true);
     try {
@@ -218,10 +215,19 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       });
       if (res.ok) {
         fetchConflictos();
-        Swal.fire({ icon: 'success', title: 'Historial Limpio', background: '#0f172a', color: '#f8fafc' });
+        addToast({ 
+          type: 'success', 
+          title: 'Historial Limpio',
+          duration: 3000
+        });
       }
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo limpiar el historial.', background: '#0f172a', color: '#f8fafc' });
+      addToast({ 
+        type: 'error', 
+        title: 'Error', 
+        message: 'No se pudo limpiar el historial.',
+        duration: 3000
+      });
     } finally {
       setClearing(false);
     }

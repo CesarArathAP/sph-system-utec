@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { History, ChevronDown, ChevronUp, ArrowRight, RotateCcw, Eye, X, User, Calendar, Tag, AlertCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
-import Swal from 'sweetalert2';
+import { useToast } from '../../common/Toast';
 import { API_CONFIG } from '../../../services/config';
 
 interface Version {
@@ -125,21 +125,9 @@ export default function HorarioVersionHistoryModal({
   };
 
   const handleRollback = async (versionNumero: number) => {
-    const result = await Swal.fire({
-      title: `¿Restaurar v${versionNumero}?`,
-      text: 'El horario actual será reemplazado por esta versión histórica.',
-      icon: 'warning',
-      showCancelButton: true,
-      background: '#0f172a',
-      color: '#f8fafc',
-      confirmButtonColor: '#f59e0b',
-      cancelButtonColor: '#475569',
-      confirmButtonText: 'Sí, restaurar',
-      cancelButtonText: 'Cancelar',
-      customClass: { popup: 'rounded-[2rem] border border-white/10' }
-    });
+    const result = confirm(`¿Está seguro que desea restaurar a la versión ${versionNumero}?`);
 
-    if (result.isConfirmed) {
+    if (result) {
       try {
         const response = await fetch(
           `${API_CONFIG.BASE_URL}/horarios/${horarioId}/rollback`,
@@ -159,12 +147,19 @@ export default function HorarioVersionHistoryModal({
         if (!response.ok) throw new Error('No se pudo ejecutar la reversión');
 
         fetchVersions();
-        Swal.fire({
-            icon: 'success', title: 'Restauración Exitosa', text: `Sistema revertido a la versión ${versionNumero}`,
-            background: '#0f172a', color: '#f8fafc', timer: 3000, showConfirmButton: false
+        addToast({
+            type: 'success', 
+            title: 'Restauración Exitosa', 
+            message: `Sistema revertido a la versión ${versionNumero}`,
+            duration: 3000
         });
       } catch (err) {
-        Swal.fire({ icon: 'error', title: 'Falla en Reversión', text: err instanceof Error ? err.message : 'Error desconocido', background: '#0f172a', color: '#f8fafc' });
+        addToast({ 
+          type: 'error', 
+          title: 'Falla en Reversión', 
+          message: err instanceof Error ? err.message : 'Error desconocido',
+          duration: 4000
+        });
       }
     }
   };

@@ -8,6 +8,7 @@ import { ProfesoresLayout } from '../modules/profesores';
 import { AulasLayout } from '../modules/aulas';
 import { MateriasLayout } from '../modules/materias';
 import { GruposLayout } from '../modules/grupos';
+import { ToastProvider } from '../common/Toast';
 
 interface DashboardLayoutProps {
   section?: string;
@@ -25,7 +26,8 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <ToastProvider>
+      <div className="flex h-screen bg-gray-50">
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
@@ -86,6 +88,7 @@ export default function DashboardLayout({ section = 'inicio' }: DashboardLayoutP
         onClose={() => setIsModalOpen(false)}
         onSaved={() => { setRefreshKey((k) => k + 1); setIsModalOpen(false); }}
       />
-    </div>
+      </div>
+    </ToastProvider>
   );
 }

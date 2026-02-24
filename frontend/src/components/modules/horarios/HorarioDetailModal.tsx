@@ -5,7 +5,7 @@ import {
     GraduationCap, Building2, Hash, CheckCircle, XCircle,
     Pencil, Trash2, Save, X, AlertTriangle, Info, Zap
 } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { useToast } from '../../common/Toast';
 import { API_CONFIG } from '../../../services/config';
 
 /* ── Tipos ──────────────────────────────────────────────────────────── */
@@ -91,6 +91,7 @@ function InfoRow({ icon: Icon, label, value, highlight = false }: {
 }
 
 export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Props) {
+    const { addToast } = useToast();
     const [horario, setHorario] = useState<HorarioDetail | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -143,11 +144,11 @@ export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Prop
 
     const handleSave = async () => {
         if (editForm.hora_fin <= editForm.hora_inicio) {
-            Swal.fire({ 
-              icon: 'error', 
+            addToast({ 
+              type: 'error', 
               title: 'Rango Inválido', 
-              text: 'La hora de fin debe ser mayor que la de inicio.',
-              background: '#0f172a', color: '#f8fafc', confirmButtonColor: '#3b82f6'
+              message: 'La hora de fin debe ser mayor que la de inicio.',
+              duration: 3000
             });
             return;
         }
@@ -172,33 +173,27 @@ export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Prop
             setHorario(updated);
             setEditing(false);
             onSaved?.();
-            Swal.fire({
-                icon: 'success', title: 'Actualizado', text: 'El horario se guardó correctamente.',
-                timer: 2000, showConfirmButton: false, background: '#0f172a', color: '#f8fafc'
+            addToast({
+                type: 'success', 
+                title: 'Actualizado', 
+                message: 'El horario se guardó correctamente.',
+                duration: 3000
             });
         } catch (e: any) {
-            Swal.fire({ icon: 'error', title: 'Error', text: e.message, background: '#0f172a', color: '#f8fafc' });
+            addToast({ 
+              type: 'error', 
+              title: 'Error', 
+              message: e.message,
+              duration: 4000
+            });
         } finally {
             setSaving(false);
         }
     };
 
     const handleDelete = async () => {
-        const result = await Swal.fire({
-            title: '¿Eliminar Horario?',
-            text: 'Esta acción borrará la sesión permanentemente.',
-            icon: 'warning',
-            showCancelButton: true,
-            background: '#0f172a',
-            color: '#f8fafc',
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#475569',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar',
-            customClass: { popup: 'rounded-3xl border border-white/10' }
-        });
-
-        if (result.isConfirmed) {
+        const result = confirm('¿Está seguro que desea eliminar esta sesión permanentemente?');
+        if (result) {
             try {
                 const res = await fetch(`${BASE}/horarios/${horarioId}`, {
                     method: 'DELETE',
@@ -207,9 +202,19 @@ export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Prop
                 if (!res.ok) throw new Error('No se pudo eliminar el registro.');
                 onSaved?.();
                 onClose();
-                Swal.fire({ icon: 'success', title: 'Eliminado', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+                addToast({ 
+                  type: 'success', 
+                  title: 'Eliminado', 
+                  message: 'La sesión fue eliminada correctamente.',
+                  duration: 3000
+                });
             } catch (e: any) {
-                Swal.fire({ icon: 'error', title: 'Error', text: e.message, background: '#0f172a', color: '#f8fafc' });
+                addToast({ 
+                  type: 'error', 
+                  title: 'Error', 
+                  message: e.message,
+                  duration: 4000
+                });
             }
         }
     };
@@ -384,12 +389,48 @@ export default function HorarioDetailModal({ horarioId, onClose, onSaved }: Prop
                                     <div className="space-y-8 animate-in fade-in duration-500">
                                         {/* Grid de Secciones */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-2 gap-y-4">
+                                            {/* Fila 1: Materia y Código */}
                                             <InfoRow icon={BookOpen} label="Unidad Académica" value={horario.asignacion?.materia?.nombre} highlight />
-                                            <InfoRow icon={Hash} label="Código Materia" value={horario.asignacion?.materia?.codigo_materia} />
-                                            <InfoRow icon={Users} label="Grupo" value={`${horario.asignacion?.grupo?.codigo_grupo} (${horario.asignacion?.grupo?.num_estudiantes} est.)`} highlight />
-                                            <InfoRow icon={GraduationCap} label="Catedrático" value={docenteNombre} />
-                                            <InfoRow icon={Building2} label="Espacio Físico" value={horario.aula?.nombre || 'Pendiente de Aula'} highlight />
-                                            <InfoRow icon={MapPin} label="Ubicación" value={horario.aula ? `Edif. ${horario.aula.edificio || '?'} · Piso ${horario.aula.piso || '?'}` : 'No Definida'} />
+                                            <InfoRow icon={Hash} label="Código" value={horario.asignacion?.materia?.codigo_materia} />
+                                            
+                                            {/* Fila 2: Créditos y Horas */}
+                                            <InfoRow icon={Zap} label="Créditos" value={`${horario.asignacion?.materia?.creditos ?? '—'}`} />
+                                            <InfoRow icon={Clock} label="Horas Semanales" value={`${horario.asignacion?.materia?.horas_semana ?? '—'} h`} />
+                                            
+                                            {/* Fila 3: Grupo y Carrera */}
+                                            <InfoRow icon={Users} label="Grupo" value={`${horario.asignacion?.grupo?.codigo_grupo ?? '—'} (${horario.asignacion?.grupo?.num_estudiantes ?? 0} est.)`} highlight />
+                                            <InfoRow icon={CheckCircle} label="Carrera" value={horario.asignacion?.grupo?.carrera ?? '—'} />
+                                            
+                                            {/* Fila 4: Semestre y Turno */}
+                                            <InfoRow icon={Info} label="Semestre" value={`${horario.asignacion?.grupo?.semestre ?? '—'}°`} />
+                                            <InfoRow icon={Clock} label="Turno" value={(() => {
+                                              const turnoMap: Record<string, string> = { matutino: 'Matutino', vespertino: 'Vespertino', nocturno: 'Nocturno' };
+                                              return turnoMap[horario.asignacion?.grupo?.turno ?? ''] ?? horario.asignacion?.grupo?.turno ?? '—';
+                                            })() } />
+                                            
+                                            {/* Fila 5: Docente */}
+                                            <InfoRow icon={GraduationCap} label="Docente" value={docenteNombre} />
+                                            <InfoRow icon={Building2} label="Departamento" value={horario.asignacion?.docente?.departamento ?? '—'} />
+                                            
+                                            {/* Fila 6: Aula y Capacidad */}
+                                            <InfoRow icon={MapPin} label="Aula" value={horario.aula?.nombre || 'Pendiente'} highlight />
+                                            <InfoRow icon={Hash} label="Capacidad" value={(() => {
+                                              const cap = horario.aula?.capacidad ?? 0;
+                                              const est = horario.asignacion?.grupo?.num_estudiantes ?? 0;
+                                              const status = est > cap ? '❌ Insuficiente' : '✅ Ok';
+                                              return `${cap} / ${est} ${status}`;
+                                            })() } />
+                                            
+                                            {/* Fila 7: Tipo de Sesión y Ciclo */}
+                                            <InfoRow icon={Zap} label="Tipo Sesión" value={TIPO_CONFIG[horario.tipo_sesion]?.label ?? horario.tipo_sesion} />
+                                            <InfoRow icon={CalendarDays} label="Ciclo Escolar" value={horario.asignacion?.ciclo_escolar ?? '—'} />
+                                            
+                                            {/* Fila 8: Día y Hora */}
+                                            <InfoRow icon={CalendarDays} label="Día" value={DIA_LABEL[horario.dia_semana] ?? horario.dia_semana} />
+                                            <InfoRow icon={Clock} label="Horario" value={`${horario.hora_inicio.slice(0, 5)} — ${horario.hora_fin.slice(0, 5)}`} />
+                                            
+                                            {/* Fila 9: Estado */}
+                                            <InfoRow icon={horario.activo ? CheckCircle : XCircle} label="Estado" value={horario.activo ? '✅ Activo' : '❌ Inactivo'} />
                                         </div>
 
                                         {/* Footer Acción */}

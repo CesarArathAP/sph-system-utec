@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight, History, LayoutGrid, Info } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { useToast } from '../../common/Toast';
 import { API_CONFIG } from '../../../services/config';
 
 /* ── Tipos ────────────────────────────────────────────────────────── */
@@ -39,6 +39,7 @@ interface Props {
 }
 
 const ScheduleGridView: React.FC<Props> = ({ cicloEscolar }) => {
+  const { addToast } = useToast();
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [gridData, setGridData] = useState<GridData | null>(null);
@@ -113,19 +114,14 @@ const ScheduleGridView: React.FC<Props> = ({ cicloEscolar }) => {
 
   useEffect(() => {
     if (error) {
-      Swal.fire({
-        icon: 'error',
+      addToast({
+        type: 'error',
         title: 'Error',
-        text: error,
-        background: '#0f172a',
-        color: '#f8fafc',
-        confirmButtonColor: '#3b82f6',
-        customClass: {
-          popup: 'rounded-2xl border border-white/10 shadow-2xl',
-        }
+        message: error,
+        duration: 4000
       });
     }
-  }, [error]);
+  }, [error, addToast]);
 
   const handlePrevVersion = () => {
     if (currentVersionIndex > 0) {

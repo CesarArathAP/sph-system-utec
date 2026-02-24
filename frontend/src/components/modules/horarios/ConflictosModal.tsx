@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, AlertTriangle, CheckCircle, Eye, RefreshCw, Trash2, Zap } from 'lucide-react';
-import Swal from 'sweetalert2';
+import { useToast } from '../../common/Toast';
 
 interface Conflicto {
   id: number;
@@ -44,52 +44,23 @@ export default function ConflictosModal({
   onClearAll,
   onViewHorario
 }: ConflictosModalProps) {
+  const { addToast } = useToast();
   if (!isOpen) return null;
 
   const irresueltos = conflictos.filter(c => !c.resuelto);
 
   const confirmClearAll = () => {
-    Swal.fire({
-      title: '¿Limpiar todo?',
-      text: 'Se eliminarán todos los registros de conflictos permanentemente.',
-      icon: 'warning',
-      showCancelButton: true,
-      background: '#0f172a',
-      color: '#f8fafc',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#475569',
-      confirmButtonText: 'Sí, limpiar todo',
-      cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'rounded-2xl border border-white/10 shadow-2xl',
-      }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        onClearAll();
-      }
-    });
+    const result = confirm('¿Está seguro que desea limpiar todo el historial de conflictos?');
+    if (result) {
+      onClearAll();
+    }
   };
 
   const confirmClearResolved = () => {
-    Swal.fire({
-      title: '¿Limpiar resueltos?',
-      text: 'Se eliminarán solo los conflictos marcados como resueltos.',
-      icon: 'question',
-      showCancelButton: true,
-      background: '#0f172a',
-      color: '#f8fafc',
-      confirmButtonColor: '#10b981',
-      cancelButtonColor: '#475569',
-      confirmButtonText: 'Sí, limpiar',
-      cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'rounded-2xl border border-white/10 shadow-2xl',
-      }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        onClearResolved();
-      }
-    });
+    const result = confirm('¿Está seguro que desea limpiar solo los conflictos resueltos?');
+    if (result) {
+      onClearResolved();
+    }
   };
 
   return (
