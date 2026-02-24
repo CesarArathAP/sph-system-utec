@@ -5,10 +5,10 @@ Maneja la creación, lectura y gestión de versiones de horarios.
 """
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 
-from app.models import HorarioSnapshot, Horario, Asignacion
+from app.models import HorarioSnapshot, Horario, Asignacion, Docente
 
 
 class SnapshotService:
@@ -43,7 +43,7 @@ class SnapshotService:
         ).join(Asignacion).filter(
             Asignacion.ciclo_escolar == ciclo_escolar
         ).options(
-            joinedload(Horario.asignacion).joinedload(Asignacion.docente),
+            joinedload(Horario.asignacion).joinedload(Asignacion.docente).joinedload(Docente.user),
             joinedload(Horario.asignacion).joinedload(Asignacion.materia),
             joinedload(Horario.asignacion).joinedload(Asignacion.grupo),
             joinedload(Horario.aula)
@@ -61,7 +61,7 @@ class SnapshotService:
                 "hora_inicio": h.hora_inicio.isoformat(),
                 "hora_fin": h.hora_fin.isoformat(),
                 "tipo_sesion": h.tipo_sesion,
-                "docente_nombre": h.asignacion.docente.nombre if h.asignacion and h.asignacion.docente else None,
+                "docente_nombre": h.asignacion.docente.user.nombre if h.asignacion and h.asignacion.docente and h.asignacion.docente.user else None,
                 "materia_nombre": h.asignacion.materia.nombre if h.asignacion and h.asignacion.materia else None,
                 "grupo_nombre": h.asignacion.grupo.nombre if h.asignacion and h.asignacion.grupo else None,
             })
