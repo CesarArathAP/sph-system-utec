@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, Loader2, ChevronLeft, ChevronRight, History, LayoutGrid, Info } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { API_CONFIG } from '../../../services/config';
 
 /* ── Tipos ────────────────────────────────────────────────────────── */
@@ -50,7 +51,7 @@ const ScheduleGridView: React.FC<Props> = ({ cicloEscolar }) => {
     const fetchVersions = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('auth_token');
         const response = await fetch(
           `${API_CONFIG.BASE_URL}/schedule/${cicloEscolar}/versions`,
           {
@@ -85,7 +86,7 @@ const ScheduleGridView: React.FC<Props> = ({ cicloEscolar }) => {
     const fetchGrid = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('auth_token');
         const response = await fetch(
           `${API_CONFIG.BASE_URL}/schedule/versions/${selectedVersionId}/grid`,
           {
@@ -110,6 +111,22 @@ const ScheduleGridView: React.FC<Props> = ({ cicloEscolar }) => {
     fetchGrid();
   }, [selectedVersionId]);
 
+  useEffect(() => {
+    if (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error,
+        background: '#0f172a',
+        color: '#f8fafc',
+        confirmButtonColor: '#3b82f6',
+        customClass: {
+          popup: 'rounded-2xl border border-white/10 shadow-2xl',
+        }
+      });
+    }
+  }, [error]);
+
   const handlePrevVersion = () => {
     if (currentVersionIndex > 0) {
       const newIndex = currentVersionIndex - 1;
@@ -133,195 +150,199 @@ const ScheduleGridView: React.FC<Props> = ({ cicloEscolar }) => {
   const getSessionColor = (tipo: string) => {
     switch (tipo.toLowerCase()) {
       case 'teorica':
-        return 'bg-blue-100 border-l-4 border-blue-500';
+        return 'bg-blue-500/20 border-l-4 border-blue-500 text-blue-200';
       case 'practica':
-        return 'bg-green-100 border-l-4 border-green-500';
+        return 'bg-emerald-500/20 border-l-4 border-emerald-500 text-emerald-200';
       case 'laboratorio':
-        return 'bg-purple-100 border-l-4 border-purple-500';
+        return 'bg-violet-500/20 border-l-4 border-violet-500 text-violet-200';
       default:
-        return 'bg-gray-100 border-l-4 border-gray-500';
+        return 'bg-gray-500/20 border-l-4 border-gray-500 text-gray-200';
     }
   };
 
   if (loading && !gridData) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="animate-spin mr-2" />
-        <span>Cargando horario...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
-        <AlertCircle className="text-red-600 mr-3 flex-shrink-0 mt-0.5" />
-        <div>
-          <h3 className="text-red-800 font-semibold">Error</h3>
-          <p className="text-red-700">{error}</p>
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
+        <div className="p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 animate-pulse">
+           <Loader2 className="animate-spin text-blue-500" size={40} />
         </div>
+        <span className="text-gray-400 font-bold tracking-widest uppercase text-xs">Cargando horario...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Selector de Versiones */}
       {versions.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Calendar className="mr-2 text-blue-600" size={20} />
-              Historial de Versiones
-            </h3>
-            <span className="text-sm text-gray-500">
-              {currentVersionIndex + 1} de {versions.length}
-            </span>
+        <div className="bg-[#0a1532]/40 backdrop-blur-xl rounded-3xl border border-white/5 p-6 shadow-2xl">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+               <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                  <History className="text-blue-500" size={24} />
+               </div>
+               <div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">Historial de Versiones</h3>
+                  <p className="text-blue-400/60 text-xs font-bold tracking-widest uppercase mt-0.5">Control de Auditoría</p>
+               </div>
+            </div>
+
+            <div className="flex items-center gap-4 bg-white/5 p-2 rounded-2xl border border-white/5">
+                <button
+                  onClick={handlePrevVersion}
+                  disabled={currentVersionIndex === 0}
+                  className="p-2.5 bg-white/5 text-white rounded-xl disabled:opacity-20 disabled:cursor-not-allowed hover:bg-white/10 transition-all border border-white/5 active:scale-90"
+                >
+                  <ChevronLeft size={20} strokeWidth={2.5} />
+                </button>
+                <div className="px-4 text-center min-w-[120px]">
+                   <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Estado</p>
+                   <p className="text-sm font-bold text-white">{currentVersionIndex + 1} de {versions.length}</p>
+                </div>
+                <button
+                  onClick={handleNextVersion}
+                  disabled={currentVersionIndex === versions.length - 1}
+                  className="p-2.5 bg-white/5 text-white rounded-xl disabled:opacity-20 disabled:cursor-not-allowed hover:bg-white/10 transition-all border border-white/5 active:scale-90"
+                >
+                  <ChevronRight size={20} strokeWidth={2.5} />
+                </button>
+            </div>
           </div>
 
           {gridData && (
-            <div className="bg-gray-50 p-3 rounded-lg mb-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-gray-600">Versión:</span>
-                  <p className="font-semibold text-gray-900">
-                    v{gridData.version_numero}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-gray-600">Tipo:</span>
-                  <p className="font-semibold text-gray-900">
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <p className="text-[10px] text-white/30 font-black uppercase tracking-widest mb-1">Versión</p>
+                  <p className="text-lg font-black text-blue-400">v{gridData.version_numero}</p>
+               </div>
+               <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <p className="text-[10px] text-white/30 font-black uppercase tracking-widest mb-1">Ciclo Escolar</p>
+                  <p className="text-base font-bold text-white">{gridData.ciclo_escolar}</p>
+               </div>
+               <div className="p-4 rounded-2xl bg-white/5 border border-white/5 lg:col-span-2">
+                  <p className="text-[10px] text-white/30 font-black uppercase tracking-widest mb-1">Fecha de Registro</p>
+                  <p className="text-base font-bold text-white">
                     {gridData.created_at
                       ? new Date(gridData.created_at).toLocaleDateString('es-ES', {
+                          weekday: 'long',
                           year: 'numeric',
-                          month: 'short',
+                          month: 'long',
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit',
                         })
-                      : ''}
+                      : 'N/A'}
                   </p>
-                </div>
-              </div>
+               </div>
             </div>
           )}
-
-          {/* Navegación de Versiones */}
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrevVersion}
-              disabled={currentVersionIndex === 0}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300"
-            >
-              <ChevronLeft size={18} />
-              Anterior
-            </button>
-            <button
-              onClick={handleNextVersion}
-              disabled={currentVersionIndex === versions.length - 1}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300"
-            >
-              Siguiente
-              <ChevronRight size={18} />
-            </button>
-          </div>
         </div>
       )}
 
       {/* Grid de Horarios */}
       {gridData && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-x-auto">
-          <div className="mb-4 flex items-center gap-2">
-            <Clock className="text-green-600" size={20} />
-            <h3 className="text-lg font-semibold text-gray-900">
-              Vista General de Horarios
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6">
-            {/* Tabla de Horarios */}
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 bg-gray-100 border border-gray-300 px-2 py-2 text-left text-sm font-semibold text-gray-900 min-w-24">
-                      Hora
-                    </th>
-                    {gridData.dias.map((dia) => (
-                      <th
-                        key={dia}
-                        className="bg-gray-100 border border-gray-300 px-3 py-2 text-center text-sm font-semibold text-gray-900 min-w-48"
-                      >
-                        {dia.charAt(0).toUpperCase() + dia.slice(1).toLowerCase()}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {gridData.horas.map((hora) => (
-                    <tr key={hora}>
-                      <td className="sticky left-0 bg-gray-50 border border-gray-300 px-2 py-2 text-sm font-medium text-gray-900 min-w-24">
-                        {formatTime(hora)}
-                      </td>
-                      {gridData.dias.map((dia) => {
-                        const sessions = gridData.grid[dia.toUpperCase()]?.[hora] || [];
-                        return (
-                          <td
-                            key={`${dia}-${hora}`}
-                            className="border border-gray-300 px-2 py-2 text-xs align-top"
-                          >
-                            <div className="space-y-1">
-                              {sessions.map((session, idx) => (
-                                <div
-                                  key={idx}
-                                  className={`p-2 rounded text-xs ${getSessionColor(
-                                    session.tipo_sesion
-                                  )}`}
-                                >
-                                  <div className="font-semibold text-gray-900">
-                                    {session.materia}
-                                  </div>
-                                  <div className="text-gray-700">
-                                    {session.docente}
-                                  </div>
-                                  <div className="text-gray-600">
-                                    {session.grupo} | {session.aula}
-                                  </div>
-                                  <div className="text-gray-500 mt-1">
-                                    {session.tipo_sesion.charAt(0).toUpperCase() +
-                                      session.tipo_sesion.slice(1)}
-                                  </div>
-                                </div>
-                              ))}
-                              {sessions.length === 0 && (
-                                <div className="p-2 text-gray-400">—</div>
-                              )}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="bg-[#0a1532]/20 backdrop-blur-xl rounded-3xl border border-white/5 p-6 shadow-2xl overflow-hidden flex flex-col">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+              <LayoutGrid className="text-emerald-500" size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white uppercase tracking-tight">Vista General del Campus</h3>
+              <p className="text-emerald-400/60 text-xs font-bold tracking-widest uppercase mt-0.5">Planificación Semanal</p>
             </div>
           </div>
 
+          <div className="overflow-x-auto rounded-3xl border border-white/5 bg-black/20 custom-scrollbar">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-20 bg-[#0d1b3e] border-b border-r border-white/5 px-4 py-5 text-left text-[11px] font-black text-white/40 uppercase tracking-[0.2em] min-w-24">
+                    Hora
+                  </th>
+                  {gridData.dias.map((dia) => (
+                    <th
+                      key={dia}
+                      className="bg-[#0d1b3e] border-b border-white/5 px-4 py-5 text-center text-[13px] font-black text-white uppercase tracking-widest min-w-56"
+                    >
+                      {dia}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {gridData.horas.map((hora) => (
+                  <tr key={hora} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="sticky left-0 z-10 bg-[#0d1b3e]/95 backdrop-blur-sm border-r border-white/5 px-4 py-6 text-xs font-black text-white/60 tracking-widest text-center">
+                      {formatTime(hora)}
+                    </td>
+                    {gridData.dias.map((dia) => {
+                      const sessions = gridData.grid[dia.toUpperCase()]?.[hora] || [];
+                      return (
+                        <td
+                          key={`${dia}-${hora}`}
+                          className="px-2 py-3 align-top min-w-56"
+                        >
+                          <div className="space-y-2">
+                            {sessions.map((session, idx) => (
+                              <div
+                                key={idx}
+                                className={`p-4 rounded-2xl backdrop-blur-md shadow-lg border border-white/5 transition-all hover:scale-[1.03] hover:shadow-2xl ${getSessionColor(
+                                  session.tipo_sesion
+                                )}`}
+                              >
+                                <div className="font-black text-[13px] mb-1 leading-tight">
+                                  {session.materia}
+                                </div>
+                                <div className="text-[11px] font-bold opacity-80 mb-2">
+                                  {session.docente}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                   <span className="px-2 py-0.5 bg-black/20 rounded-md text-[10px] font-black uppercase tracking-tighter">
+                                     {session.grupo}
+                                   </span>
+                                   <span className="px-2 py-0.5 bg-black/20 rounded-md text-[10px] font-black uppercase tracking-tighter">
+                                     {session.aula}
+                                   </span>
+                                </div>
+                                <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
+                                   <span>{session.tipo_sesion}</span>
+                                   <Clock size={10} />
+                                </div>
+                              </div>
+                            ))}
+                            {sessions.length === 0 && (
+                              <div className="h-24 flex items-center justify-center border-2 border-dashed border-white/[0.03] rounded-2xl group transition-all hover:bg-white/[0.01]">
+                                <span className="text-[10px] font-black text-white/5 uppercase tracking-[0.3em] group-hover:text-white/10 transition-colors">Disponible</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
           {/* Leyenda */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">Leyenda:</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-300 rounded border-l-4 border-blue-500"></div>
-                <span className="text-sm text-gray-700">Sesión Teórica</span>
+          <div className="mt-10 p-6 rounded-3xl bg-white/5 border border-white/5">
+            <div className="flex items-center gap-2 mb-6">
+               <Info size={16} className="text-white/40" />
+               <h4 className="text-[11px] font-black uppercase text-white/40 tracking-[0.2em]">Guía Visual de Sesiones</h4>
+            </div>
+            <div className="flex flex-wrap gap-8">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-lg bg-blue-500/20 border-2 border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Teórica</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-300 rounded border-l-4 border-green-500"></div>
-                <span className="text-sm text-gray-700">Sesión Práctica</span>
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-lg bg-emerald-500/20 border-2 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Práctica</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-purple-300 rounded border-l-4 border-purple-500"></div>
-                <span className="text-sm text-gray-700">Laboratorio</span>
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-lg bg-violet-500/20 border-2 border-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.5)]"></div>
+                <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Laboratorio</span>
               </div>
             </div>
           </div>
