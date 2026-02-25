@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookOpen, Search, Pencil, Trash2, RefreshCw, Plus,
   FlaskConical, Monitor, Mic, LayoutGrid,
-  CheckCircle2, XCircle, AlertTriangle, Info, X,
+  CheckCircle2, XCircle, AlertTriangle, Info, X, PauseCircle, PlayCircle,
 } from 'lucide-react';
 import MateriasModal from './MateriasModal';
 import { API_CONFIG } from '../../../services/config';
@@ -205,6 +205,27 @@ export default function MateriasLayout() {
     }
   };
 
+  /* ── Suspender/Reactivar */
+  const handleSuspend = async (id: number | undefined) => {
+    if (!id) return;
+    const m = materias.find(x => x.id === id);
+    try {
+      const res = await fetch(`${BASE}/${id}/toggle-activo`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      await fetchMaterias();
+      const newState = m?.activo ? 'Materia suspendida' : 'Materia reactivada';
+      const msg = m?.activo 
+        ? `"${m?.nombre ?? id}" fue suspendida` 
+        : `"${m?.nombre ?? id}" fue reactivada`;
+      addToast('success', newState, msg);
+    } catch (e: any) {
+      addToast('error', 'No se pudo actualizar', e.message);
+    }
+  };
+
   const filtered = materias.filter(m =>
     m.codigo_materia.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.nombre.toLowerCase().includes(searchTerm.toLowerCase())
@@ -334,6 +355,16 @@ export default function MateriasLayout() {
                           className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 transition cursor-pointer"
                           title="Editar materia">
                           <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleSuspend(materia.id)}
+                          className={`p-1.5 rounded-lg transition cursor-pointer ${
+                            materia.activo
+                              ? 'hover:bg-amber-500/20 text-amber-400'
+                              : 'hover:bg-green-500/20 text-green-400'
+                          }`}
+                          title={materia.activo ? 'Suspender materia' : 'Reactivar materia'}>
+                          {materia.activo ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
                         </button>
                         <button
                           onClick={() => handleDelete(materia.id)}

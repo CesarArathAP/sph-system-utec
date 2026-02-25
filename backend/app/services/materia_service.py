@@ -189,3 +189,28 @@ def delete_materia(db: Session, materia_id: int) -> Materia:
     db.refresh(materia)
     
     return materia
+
+
+def toggle_materia_activo(db: Session, materia_id: int) -> Materia:
+    """
+    Suspender o reactivar una materia.
+    
+    Args:
+        db: Sesión de base de datos
+        materia_id: ID de la materia a alternar
+        
+    Returns:
+        Materia con estado alternado
+        
+    Raises:
+        HTTPException: Si la materia no existe
+    """
+    materia = get_materia_by_id(db, materia_id)
+    
+    # Alternar estado activo
+    materia.activo = not materia.activo
+    
+    db.commit()
+    db.refresh(materia)
+    
+    return materia

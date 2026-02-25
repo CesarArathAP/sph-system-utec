@@ -681,9 +681,19 @@ def generate_schedule(db: Session, ciclo_escolar: str,
             joinedload(Asignacion.grupo),
             joinedload(Asignacion.docente).joinedload(Docente.user),
         )
-        .filter(Asignacion.ciclo_escolar == ciclo_escolar)
+        .join(Docente, Asignacion.docente_id == Docente.id)
+        .filter(
+            Asignacion.ciclo_escolar == ciclo_escolar,
+            Docente.activo == True,  # Solo docentes activos
+        )
         .all()
     )
+    
+    # Filtrar por materias activas (después de obtener para contar skipped)
+    asignaciones_activas = [a for a in asignaciones if a.materia.activo]
+    asignaciones_inactivas = len(asignaciones) - len(asignaciones_activas)
+    
+    asignaciones = asignaciones_activas  # Usar solo asignaciones con módulos activos
 
     if not asignaciones:
         raise HTTPException(

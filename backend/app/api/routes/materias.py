@@ -103,6 +103,20 @@ def update_materia(
     return materia_service.update_materia(db, materia_id, materia_data)
 
 
+@router.patch("/{materia_id}/toggle-activo", response_model=MateriaResponse)
+def toggle_materia_activo(
+    materia_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """
+    Suspender o reactivar una materia.
+    
+    Requiere rol de admin.
+    """
+    return materia_service.toggle_materia_activo(db, materia_id)
+
+
 @router.delete("/{materia_id}", response_model=MateriaResponse)
 def delete_materia(
     materia_id: int,

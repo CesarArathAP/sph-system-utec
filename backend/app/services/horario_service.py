@@ -518,13 +518,38 @@ def create_horario(db: Session, horario_data: HorarioCreate, allow_conflicts: bo
     from datetime import datetime
     
     # Verificar que la asignación existe
-    asignacion = db.query(Asignacion).filter(
+    asignacion = db.query(Asignacion).options(
+        joinedload(Asignacion.docente),
+        joinedload(Asignacion.materia),
+        joinedload(Asignacion.grupo)
+    ).filter(
         Asignacion.id == horario_data.asignacion_id
     ).first()
     if not asignacion:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Asignación con ID {horario_data.asignacion_id} no encontrada"
+        )
+    
+    # Verificar que docente está activo
+    if not asignacion.docente.activo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El docente no está activo y no puede ser asignado a horarios"
+        )
+    
+    # Verificar que materia está activa
+    if not asignacion.materia.activo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La materia '{asignacion.materia.nombre}' no está activa"
+        )
+    
+    # Verificar que el grupo existe (no tiene campo activo verificable en el contexto actual)
+    if not asignacion.grupo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Grupo no encontrado para la asignación"
         )
     
     # Verificar que el aula existe y está activa
@@ -666,6 +691,35 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
     hora_inicio = update_data.get('hora_inicio', horario.hora_inicio)
     hora_fin = update_data.get('hora_fin', horario.hora_fin)
     
+    # Verificar que aula está activa si cambia o es la actual
+    aula = db.query(Aula).filter(Aula.id == aula_id).first()
+    if aula and not aula.activo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El aula '{aula.nombre}' no está activa"
+        )
+    
+    # Verificar asignación y sus relaciones si cambia o es la actual
+    if any(key in update_data for key in ['asignacion_id']):
+        asig_check = db.query(Asignacion).options(
+            joinedload(Asignacion.docente),
+            joinedload(Asignacion.materia),
+            joinedload(Asignacion.grupo)
+        ).filter(Asignacion.id == asignacion_id).first()
+        if asig_check:
+            # Verificar docente está activo
+            if not asig_check.docente.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El docente no está activo y no puede ser asignado a horarios"
+                )
+            # Verificar materia está activa
+            if not asig_check.materia.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"La materia '{asig_check.materia.nombre}' no está activa"
+                )
+    
     # Verificar capacidad del aula si cambia aula o asignación
     if any(key in update_data for key in ['aula_id', 'asignacion_id']):
         check_capacidad_aula(
@@ -704,7 +758,6 @@ def update_horario(db: Session, horario_id: int, horario_data: HorarioUpdate) ->
             dia_semana=dia_semana,
             hora_inicio=hora_inicio,
             hora_fin=hora_fin,
-            exclude_horario_id=horario_id
         )
 
     # Actualizar campos
