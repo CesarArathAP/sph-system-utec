@@ -22,12 +22,23 @@ export function useProfesoresTable() {
       const res = await fetch(`${BASE}?page=1&page_size=100`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        if (res.status === 403) throw new Error('No tienes permisos para ver los docentes.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un problema al obtener los docentes. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudieron cargar los docentes (código ${res.status}).`);
+      }
       const data = await res.json();
       setDocentes(data.docentes ?? []);
       setTotal(data.total ?? 0);
     } catch (e: any) {
-      setError(e.message ?? 'Error al cargar docentes');
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al cargar los docentes.')
+      );
     } finally {
       setLoading(false);
     }
