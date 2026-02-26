@@ -2,7 +2,7 @@
  * Tipos y interfaces del módulo de asignaciones
  */
 
-import type { Docente } from '../../profesores/ProfesoresLayout';
+import type { Docente } from '../../profesores/logic/types';
 
 export interface AssignmentModalProps {
   isOpen: boolean;

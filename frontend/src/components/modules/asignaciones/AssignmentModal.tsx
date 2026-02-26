@@ -5,7 +5,7 @@ import {
   Clock, BarChart2, CalendarDays, X,
 } from 'lucide-react';
 import DisponibilidadViewModal from '../profesores/DisponibilidadViewModal';
-import type { Docente } from '../profesores/ProfesoresLayout';
+import type { Docente } from '../profesores/logic/types';
 import type { AssignmentModalProps, AsignacionOption } from './logic/types';
 import { useAssignmentModal } from './logic/useAssignmentModal';
 import { useManualSchedule } from './logic/useManualSchedule';

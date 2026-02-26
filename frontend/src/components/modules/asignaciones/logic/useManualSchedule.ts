@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { API_CONFIG } from '../../../../services/config';
 import { useToast } from '../../../common/Toast';
 import type { ManualFormState, AsignacionOption, DisponibilidadError, HorasMaxError } from './types';
-import type { Docente } from '../../profesores/ProfesoresLayout';
+import type { Docente } from '../../profesores/logic/types';
 import { EMPTY_FORM } from './constants';
 
 function getToken() {
