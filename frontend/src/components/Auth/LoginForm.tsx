@@ -19,10 +19,14 @@ export default function LoginForm() {
         // Token guardado en authService.login(), redirigir al dashboard
         window.location.href = '/auth/dashboard';
       } else {
-        setError(response.message || 'Credenciales incorrectas');
+        setError(response.message || 'Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.');
       }
     } catch (err) {
-      setError('Error de conexión con el servidor');
+      setError(
+        err instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : 'Ocurrió un error inesperado. Intenta de nuevo.'
+      );
     } finally {
       setLoading(false);
     }
