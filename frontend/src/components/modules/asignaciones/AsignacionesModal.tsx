@@ -1,83 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { RefreshCw, BookCopy, X, AlertTriangle } from 'lucide-react';
-import { API_CONFIG } from '../../../services/config';
+import { useAsignacionesForm } from './logic/useAsignacionesForm';
+import type { AsignacionesModalProps, DocenteOption } from './logic/types';
 
-interface Asignacion {
-  id: number; grupo_id: number; materia_id: number; docente_id: number; ciclo_escolar: string;
-  grupo?:   { id: number; nombre: string; codigo_grupo: string };
-  materia?: { id: number; nombre: string; codigo_materia: string };
-  docente?: { id: number; codigo_docente: string; user?: { nombre: string; apellido: string } };
-}
-interface GrupoOption   { id: number; nombre: string; codigo_grupo: string; carrera: string; semestre: number; ciclo_escolar: string }
-interface MateriaOption { id: number; nombre: string; codigo_materia: string; horas_semana: number }
-interface DocenteOption { id: number; codigo_docente: string; user?: { nombre: string; apellido: string } }
-interface Props { isOpen: boolean; editing: Asignacion | null; onClose: () => void; onSaved: () => void; }
-
-function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE  = API_CONFIG.BASE_URL;
-const EMPTY = { grupo_id: 0, materia_id: 0, docente_id: 0, ciclo_escolar: '' };
-
-const INPUT  = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm placeholder:text-white/40 outline-none transition focus:border-white/60 focus:bg-white/20';
+const INPUT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm placeholder:text-white/40 outline-none transition focus:border-white/60 focus:bg-white/20';
 const SELECT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-[#0d2a6e] text-white text-sm outline-none transition focus:border-white/60 cursor-pointer';
-const LABEL  = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
+const LABEL = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
 
-export default function AsignacionesModal({ isOpen, editing, onClose, onSaved }: Props) {
-  const isEdit = !!editing;
-  const [form, setForm]           = useState(EMPTY);
-  const [grupos, setGrupos]       = useState<GrupoOption[]>([]);
-  const [materias, setMaterias]   = useState<MateriaOption[]>([]);
-  const [docentes, setDocentes]   = useState<DocenteOption[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+const docenteLabel = (d: DocenteOption) =>
+  d.user ? `${d.user.nombre} ${d.user.apellido} (${d.codigo_docente})` : d.codigo_docente;
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setError(null);
-    setForm(isEdit && editing
-      ? { grupo_id: editing.grupo_id, materia_id: editing.materia_id, docente_id: editing.docente_id, ciclo_escolar: editing.ciclo_escolar }
-      : EMPTY);
-    const load = async () => {
-      setLoadingData(true);
-      try {
-        const [rG, rM, rD] = await Promise.all([
-          fetch(`${BASE}/grupos?page=1&page_size=100&activo=true`,   { headers: { Authorization: `Bearer ${getToken()}` } }),
-          fetch(`${BASE}/materias?page=1&page_size=100&activo=true`, { headers: { Authorization: `Bearer ${getToken()}` } }),
-          fetch(`${BASE}/docentes?page=1&page_size=100&activo=true`, { headers: { Authorization: `Bearer ${getToken()}` } }),
-        ]);
-        const dg = rG.ok ? await rG.json() : {}; const dm = rM.ok ? await rM.json() : {}; const dd = rD.ok ? await rD.json() : {};
-        setGrupos(dg.grupos ?? []); setMaterias(dm.materias ?? []); setDocentes(dd.docentes ?? []);
-      } finally { setLoadingData(false); }
-    };
-    load();
-  }, [isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm(p => ({ ...p, [name]: ['grupo_id','materia_id','docente_id'].includes(name) ? parseInt(value)||0 : value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.grupo_id || !form.materia_id || !form.docente_id) { setError('Selecciona grupo, materia y docente'); return; }
-    if (!form.ciclo_escolar.trim()) { setError('El ciclo escolar es requerido'); return; }
-    setSaving(true); setError(null);
-    try {
-      const url = isEdit ? `${BASE}/asignaciones/${editing!.id}` : `${BASE}/asignaciones`;
-      const res = await fetch(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.detail ?? `Error ${res.status}`); }
-      onSaved();
-    } catch (e: any) { setError(e.message ?? 'Error al guardar'); }
-    finally { setSaving(false); }
-  };
-
-  const docenteLabel = (d: DocenteOption) =>
-    d.user ? `${d.user.nombre} ${d.user.apellido} (${d.codigo_docente})` : d.codigo_docente;
+export default function AsignacionesModal({ isOpen, editing, onClose, onSaved }: AsignacionesModalProps) {
+  const { form, grupos, materias, docentes, loadingData, saving, error, isEdit, handleChange, handleSubmit } =
+    useAsignacionesForm(isOpen, editing, onSaved);
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={o => !o && onClose()}>
