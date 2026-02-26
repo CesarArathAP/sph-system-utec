@@ -44,6 +44,7 @@ export function useAulasActions(onRefresh: () => Promise<void>) {
 
   const handleToggleActivo = useCallback(
     async (aula: Aula) => {
+      const accion = aula.activo ? 'suspender' : 'activar';
       try {
         const res = await fetch(`${BASE}/${aula.id}`, {
           method: 'PUT',
@@ -55,17 +56,29 @@ export function useAulasActions(onRefresh: () => Promise<void>) {
         });
 
         if (!res.ok) {
-          throw new Error(`Error ${res.status}`);
+          const err = await res.json().catch(() => null);
+          const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+          if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+          if (res.status === 403) throw new Error(`No tienes permisos para ${accion} esta aula.`);
+          if (res.status === 409) throw new Error(serverMsg ?? `El aula "${aula.nombre}" tiene conflictos que impiden ${accion}la.`);
+          if (res.status >= 500) throw new Error(serverMsg ?? `El servidor tuvo un error al intentar ${accion} el aula. Intenta de nuevo.`);
+          throw new Error(serverMsg ?? `No se pudo ${accion} el aula (código ${res.status}).`);
         }
 
         await onRefresh();
         addToast(
           aula.activo ? 'warning' : 'success',
           aula.activo ? 'Aula suspendida' : 'Aula activada',
-          `"${aula.nombre}" fue ${aula.activo ? 'suspendida' : 'activada'}`
+          `"${aula.nombre}" fue ${aula.activo ? 'suspendida' : 'activada'} exitosamente`
         );
       } catch (e: any) {
-        addToast('error', 'No se pudo actualizar', e.message);
+        addToast(
+          'error',
+          `No se pudo ${accion} el aula`,
+          e instanceof TypeError
+            ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+            : e.message
+        );
       }
     },
     [onRefresh, addToast]
@@ -82,6 +95,7 @@ export function useAulasActions(onRefresh: () => Promise<void>) {
 
   const confirmDelete = useCallback(async () => {
     const { id, msg } = confirm;
+    const aulaName = msg.split('"')[1] ?? id;
     setConfirm({ open: false, msg: '' });
 
     if (!id) return;
@@ -93,13 +107,25 @@ export function useAulasActions(onRefresh: () => Promise<void>) {
       });
 
       if (!res.ok) {
-        throw new Error(`Error ${res.status}`);
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        if (res.status === 403) throw new Error('No tienes permisos para eliminar esta aula.');
+        if (res.status === 409) throw new Error(serverMsg ?? `El aula "${aulaName}" no se puede eliminar porque está siendo usada en horarios activos. Sustítuyela primero.`);
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un error al eliminar el aula. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudo eliminar el aula (código ${res.status}).`);
       }
 
       await onRefresh();
-      addToast('info', 'Aula eliminada', `${msg.split('"')[1] ?? id} fue eliminada`);
+      addToast('info', 'Aula eliminada', `"${aulaName}" fue eliminada exitosamente`);
     } catch (e: any) {
-      addToast('error', 'No se pudo eliminar', e.message);
+      addToast(
+        'error',
+        'No se pudo eliminar el aula',
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : e.message
+      );
     }
   }, [confirm, onRefresh, addToast]);
 

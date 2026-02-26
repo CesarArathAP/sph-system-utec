@@ -44,13 +44,22 @@ export function useAulasTable() {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) {
-        throw new Error(`Error ${res.status}`);
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        if (res.status === 403) throw new Error('No tienes permisos para ver las aulas.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un problema al obtener las aulas. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudieron cargar las aulas (código ${res.status})`);
       }
       const data = await res.json();
       setAulas((data.aulas ?? []).map(fromBackend));
       setTotal(data.total ?? 0);
     } catch (e: any) {
-      setError(e.message ?? 'Error al cargar aulas');
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al cargar las aulas.')
+      );
     } finally {
       setLoading(false);
     }

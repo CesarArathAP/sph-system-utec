@@ -123,6 +123,7 @@ export default function AulasLayout() {
   /* ── Guardar ── */
   const handleSave = async (aula: Aula) => {
     const isNew = !selectedAula?.id;
+    const accion = isNew ? 'crear' : 'actualizar';
     try {
       const method = isNew ? 'POST' : 'PUT';
       const url = isNew ? `${API_CONFIG.BASE_URL}/aulas` : `${API_CONFIG.BASE_URL}/aulas/${selectedAula!.id}`;
@@ -145,18 +146,29 @@ export default function AulasLayout() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        const msg = err?.detail ?? `Error ${res.status}`;
-        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error(`No tienes permisos para ${accion} aulas.`);
+        if (res.status === 409) throw new Error(serverMsg ?? `Ya existe un aula con el código "${aula.codigo}". Usa un código diferente.`);
+        if (res.status === 422) throw new Error(serverMsg ?? 'Algunos campos tienen valores inválidos. Revisa el formulario e intenta de nuevo.');
+        if (res.status >= 500) throw new Error(serverMsg ?? `El servidor tuvo un error al ${accion} el aula. Intenta de nuevo más tarde.`);
+        throw new Error(serverMsg ?? `No se pudo ${accion} el aula (código ${res.status}).`);
       }
       setIsModalOpen(false);
       await fetchAulas();
       addToast(
         'success',
         isNew ? 'Aula creada' : 'Aula actualizada',
-        isNew ? `"${aula.nombre}" fue registrada exitosamente` : `"${aula.nombre}" fue actualizada`
+        isNew ? `"${aula.nombre}" fue registrada exitosamente` : `"${aula.nombre}" fue actualizada exitosamente`
       );
     } catch (e: any) {
-      addToast('error', 'No se pudo guardar', e.message);
+      addToast(
+        'error',
+        isNew ? 'No se pudo crear el aula' : 'No se pudo actualizar el aula',
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : e.message
+      );
     }
   };
 
@@ -227,10 +239,13 @@ export default function AulasLayout() {
 
       {/* ── Error ── */}
       {error && !loading && (
-        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20
                         text-red-400 rounded-xl px-4 py-3 text-sm mb-5">
-          <XCircle size={18} className="shrink-0 text-red-400" />
-          {error}
+          <XCircle size={18} className="shrink-0 text-red-400 mt-0.5" />
+          <div>
+            <p className="font-semibold">No se pudieron cargar las aulas</p>
+            <p className="text-red-400/80 text-xs mt-0.5">{error}</p>
+          </div>
         </div>
       )}
 
