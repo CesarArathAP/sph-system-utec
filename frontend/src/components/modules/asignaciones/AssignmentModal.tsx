@@ -5,6 +5,7 @@ import {
   Clock, BarChart2, CalendarDays, X,
 } from 'lucide-react';
 import { API_CONFIG } from '../../../services/config';
+import { useToast } from '../../common/Toast';
 import DisponibilidadViewModal from '../profesores/DisponibilidadViewModal';
 import type { Docente } from '../profesores/ProfesoresLayout';
 
@@ -43,7 +44,8 @@ const LABEL  = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide u
 const INPUT  = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm placeholder:text-white/40 outline-none transition focus:border-white/60 focus:bg-white/20';
 
 export default function AssignmentModal({ isOpen, onClose, onSaved }: AssignmentModalProps) {
-  const [tab, setTab] = useState<'manual' | 'auto'>('manual');
+  const { addToast } = useToast();
+  const [tab, setTab] = useState<'manual' | 'auto'>('auto');
 
   /* Manual */
   const [form, setForm]                         = useState(EMPTY_FORM);
@@ -88,8 +90,26 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
   /* Crear horario manual */
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.hora_fin <= form.hora_inicio) { setErrorManual('La hora de fin debe ser mayor que la de inicio'); return; }
-    if (!form.asignacion_id || !form.aula_id) { setErrorManual('Debes seleccionar una asignación y un aula'); return; }
+    if (form.hora_fin <= form.hora_inicio) { 
+      setErrorManual('La hora de fin debe ser mayor que la de inicio');
+      addToast({
+        type: 'error',
+        title: '✗ Error en horario',
+        message: 'La hora de fin debe ser mayor que la de inicio',
+        duration: 3000
+      });
+      return; 
+    }
+    if (!form.asignacion_id || !form.aula_id) { 
+      setErrorManual('Debes seleccionar una asignación y un aula');
+      addToast({
+        type: 'error',
+        title: '✗ Campos incompletos',
+        message: 'Debes seleccionar una asignación y un aula',
+        duration: 3000
+      });
+      return; 
+    }
     setSaving(true); setErrorManual(null); setDisponibilidadError(null); setHorasMaxError(null);
     try {
       const res = await fetch(`${BASE}/horarios`, {
@@ -102,14 +122,35 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
         const detail = err?.detail;
         if (detail && typeof detail === 'object' && detail.mensaje) {
           setErrorManual(detail.mensaje);
+          addToast({
+            type: 'error',
+            title: '✗ No se pudo crear',
+            message: detail.mensaje,
+            duration: 4000
+          });
           if (detail.disponibilidad_docente) setDisponibilidadError(detail.disponibilidad_docente);
           if (detail.horas_maximas) setHorasMaxError(detail.horas_maximas);
           return;
         }
         throw new Error(typeof detail === 'string' ? detail : `Error ${res.status}`);
       }
+      addToast({
+        type: 'success',
+        title: '✓ Horario creado',
+        message: 'El horario se creó correctamente',
+        duration: 3000
+      });
       onSaved?.(); onClose();
-    } catch (e: any) { setErrorManual(e.message ?? 'Error al crear el horario'); }
+    } catch (e: any) { 
+      const errorMsg = e.message ?? 'Error al crear el horario';
+      setErrorManual(errorMsg);
+      addToast({
+        type: 'error',
+        title: '✗ Error',
+        message: errorMsg,
+        duration: 4000
+      });
+    }
     finally { setSaving(false); }
   };
 
@@ -125,9 +166,37 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
         method: 'POST', headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.detail ?? `Error ${res.status}`); }
-      setGenResult(await res.json());
+      const result = await res.json();
+      setGenResult(result);
+      
+      // Mostrar Toast de éxito
+      if (!result.alertas || result.alertas.length === 0) {
+        addToast({
+          type: 'success',
+          title: '✓ Horarios generados',
+          message: `Se crearon ${result.horarios_creados ?? 0} horarios exitosamente para el ciclo ${ciclo}`,
+          duration: 4000
+        });
+      } else {
+        // Mostrar Toast de error si hay alertas críticas
+        addToast({
+          type: 'error',
+          title: '✗ Error en la generación',
+          message: `No se pudieron generar los horarios. ${result.alertas[0]?.titulo ?? 'Verifique los datos'}`,
+          duration: 5000
+        });
+      }
       onSaved?.();
-    } catch (e: any) { setErrorAuto(e.message ?? 'Error al generar horarios'); }
+    } catch (e: any) { 
+      const errorMsg = e.message ?? 'Error al generar horarios';
+      setErrorAuto(errorMsg);
+      addToast({
+        type: 'error',
+        title: '✗ Error',
+        message: errorMsg,
+        duration: 4000
+      });
+    }
     finally { setGenerating(false); }
   };
 
@@ -330,6 +399,22 @@ export default function AssignmentModal({ isOpen, onClose, onSaved }: Assignment
                       del ciclo indicado, respetando disponibilidad de docentes y evitando conflictos.
                     </p>
                   </div>
+
+                  {/* Barra de carga durante generación */}
+                  {generating && (
+                    <div className="space-y-4 bg-blue-500/20 border border-blue-400/30 rounded-xl p-5">
+                      <div className="flex items-center gap-3 justify-center">
+                        <RefreshCw size={24} className="animate-spin text-blue-400" />
+                        <div>
+                          <p className="font-semibold text-blue-300 text-base">Generando horarios...</p>
+                          <p className="text-blue-300/60 text-xs mt-1">Por favor espera mientras se procesan las asignaciones</p>
+                        </div>
+                      </div>
+                      <div className="w-full bg-blue-500/20 rounded-full h-2 border border-blue-400/30 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full animate-pulse w-3/4"></div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Resultado */}
                   {genResult && !generating && (
