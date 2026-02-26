@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   GraduationCap, Search, Pencil, Trash2, RefreshCw, Plus,
   CalendarDays, PowerOff, Power,
@@ -7,72 +7,42 @@ import {
 import ProfesoresModal from './ProfesoresModal';
 import DisponibilidadModal from './DisponibilidadModal';
 import DocenteHorarioModal from './DocenteHorarioModal';
-import { API_CONFIG } from '../../../services/config';
+import { useProfesoresTable } from './logic/useProfesoresTable';
+import { useProfesoresActions } from './logic/useProfesoresActions';
+import { TOAST_ACCENT, TOAST_ICON_COLOR } from './logic/constants';
+import type { Docente, Toast } from './logic/types';
 
-/* ─── Tipos ─────────────────────────────────────────────────── */
-export interface Disponibilidad {
-  id: number;
-  docente_id: number;
-  dia_semana: string;
-  hora_inicio: string;
-  hora_fin: string;
-  created_at: string;
-}
-
-export interface UserInfo {
-  id: number;
-  nombre: string;
-  apellido: string;
-  email: string;
-  activo: boolean;
-}
-
-export interface Docente {
-  id?: number;
-  user_id: number;
-  user?: UserInfo;
-  codigo_docente: string;
-  departamento: string | null;
-  horas_maximas_semana: number;
-  activo: boolean;
-  disponibilidades: Disponibilidad[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-type ToastType = 'success' | 'error' | 'warning' | 'info';
-interface Toast { id: number; type: ToastType; title: string; message: string; }
-
-/* ─── Toast ─────────────────────────────────────────────────── */
-const toastAccent: Record<ToastType, string> = {
-  success: 'bg-green-500', error: 'bg-red-500',
-  warning: 'bg-amber-500', info:  'bg-blue-500',
-};
-const toastIconColor: Record<ToastType, string> = {
-  success: 'text-green-400', error:   'text-red-400',
-  warning: 'text-amber-400', info:    'text-blue-400',
-};
-const toastIconEl: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2  size={18} />,
-  error:   <XCircle       size={18} />,
+/* ── Toast Component ────────────────────────────────────────────── */
+const toastIconEl: Record<string, React.ReactNode> = {
+  success: <CheckCircle2 size={18} />,
+  error: <XCircle size={18} />,
   warning: <AlertTriangle size={18} />,
-  info:    <Info          size={18} />,
+  info: <Info size={18} />,
 };
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
   return (
     <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-3 w-[320px] pointer-events-none">
       {toasts.map((t) => (
-        <div key={t.id}
-          className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto bg-slate-900 border border-slate-700">
-          <div className={`w-1 shrink-0 ${toastAccent[t.type]}`} />
-          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>{toastIconEl[t.type]}</div>
+        <div
+          key={t.id}
+          className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto
+                     bg-slate-900 border border-slate-700"
+        >
+          <div className={`w-1 shrink-0 ${TOAST_ACCENT[t.type]}`} />
+          <div className={`flex items-start pt-3.5 px-3 ${TOAST_ICON_COLOR[t.type]}`}>
+            {toastIconEl[t.type]}
+          </div>
           <div className="flex-1 py-3 pr-2 min-w-0">
             <p className="text-white text-sm font-semibold leading-tight">{t.title}</p>
-            {t.message && <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>}
+            {t.message && (
+              <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>
+            )}
           </div>
-          <button onClick={() => onRemove(t.id)}
-            className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start">
+          <button
+            onClick={() => onRemove(t.id)}
+            className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start"
+          >
             <X size={14} />
           </button>
         </div>
@@ -81,14 +51,26 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   );
 }
 
-/* ─── Confirm Dialog ────────────────────────────────────────── */
-function ConfirmDialog({ open, message, onConfirm, onCancel }:
-  { open: boolean; message: string; onConfirm: () => void; onCancel: () => void }) {
+/* ── Confirm Dialog ────────────────────────────────────────────── */
+function ConfirmDialog({
+  open,
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 border border-gray-200">
+      <div
+        className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4
+                      border border-gray-200"
+      >
         <div className="flex items-start gap-4 mb-4">
           <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-100 shrink-0">
             <Trash2 size={20} className="text-red-600" />
@@ -99,12 +81,19 @@ function ConfirmDialog({ open, message, onConfirm, onCancel }:
           </div>
         </div>
         <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
-          <button onClick={onCancel}
-            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium transition cursor-pointer">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700
+                       hover:bg-gray-50 text-sm font-medium transition cursor-pointer"
+          >
             Cancelar
           </button>
-          <button onClick={onConfirm}
-            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition cursor-pointer shadow-[0_2px_8px_rgba(220,38,38,0.35)]">
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white
+                       text-sm font-semibold transition cursor-pointer
+                       shadow-[0_2px_8px_rgba(220,38,38,0.35)]"
+          >
             Sí, eliminar
           </button>
         </div>
@@ -113,147 +102,38 @@ function ConfirmDialog({ open, message, onConfirm, onCancel }:
   );
 }
 
-/* ─── Helpers ───────────────────────────────────────────────── */
-function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
-
-/* ─── Componente principal ──────────────────────────────────── */
+/* ── Main Component ────────────────────────────────────────────── */
 export default function ProfesoresLayout() {
-  const [docentes, setDocentes]               = useState<Docente[]>([]);
-  const [total, setTotal]                     = useState(0);
-  const [loading, setLoading]                 = useState(true);
-  const [error, setError]                     = useState<string | null>(null);
-  const [searchTerm, setSearchTerm]           = useState('');
-  const [isModalOpen, setIsModalOpen]         = useState(false);
+  const { docentes, total, loading, error, searchTerm, setSearchTerm, filtered, fetchDocentes } =
+    useProfesoresTable();
+  const { toasts, removeToast, handleSave, handleToggleActivo, handleDelete } =
+    useProfesoresActions(fetchDocentes);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDisponibilidadOpen, setIsDisponibilidadOpen] = useState(false);
-  const [isHorarioOpen, setIsHorarioOpen]     = useState(false);
+  const [isHorarioOpen, setIsHorarioOpen] = useState(false);
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
-  const [toasts, setToasts]                   = useState<Toast[]>([]);
-  const [confirm, setConfirm]                 = useState<{ open: boolean; id?: number; msg: string }>({ open: false, msg: '' });
+  const [confirm, setConfirm] = useState<{ open: boolean; id?: number; msg: string }>({ open: false, msg: '' });
 
-  const addToast = (type: ToastType, title: string, message = '') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
-  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
-
-  /* ── Fetch */
-  const fetchDocentes = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`${BASE}?page=1&page_size=100`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
-      const data = await res.json();
-      setDocentes(data.docentes ?? []);
-      setTotal(data.total ?? 0);
-    } catch (e: any) {
-      setError(e.message ?? 'Error al cargar docentes');
-    } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchDocentes(); }, [fetchDocentes]);
-
-  /* ── Guardar */
-  const handleSave = async (docente: Docente) => {
-    const isNew = !selectedDocente?.id;
-    try {
-      const method = isNew ? 'POST' : 'PUT';
-      const url    = isNew ? BASE : `${BASE}/${selectedDocente!.id}`;
-      const body   = isNew
-        ? { user_id: docente.user_id, codigo_docente: docente.codigo_docente,
-            departamento: docente.departamento, horas_maximas_semana: docente.horas_maximas_semana, disponibilidades: [] }
-        : { codigo_docente: docente.codigo_docente, departamento: docente.departamento,
-            horas_maximas_semana: docente.horas_maximas_semana, activo: docente.activo };
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail ?? `Error ${res.status}`);
-      }
-      setIsModalOpen(false);
-      await fetchDocentes();
-      const nombre = docente.user
-        ? `${docente.user.nombre} ${docente.user.apellido}`
-        : docente.codigo_docente;
-      addToast('success',
-        isNew ? 'Docente registrado' : 'Docente actualizado',
-        isNew ? `"${nombre}" fue registrado exitosamente` : `"${nombre}" fue actualizado`
-      );
-    } catch (e: any) {
-      addToast('error', 'No se pudo guardar', e.message);
-    }
-  };
-
-  /* ── Toggle activo */
-  const handleToggleActivo = async (docente: Docente) => {
-    if (!docente.id) return;
-    try {
-      const res = await fetch(`${BASE}/${docente.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ activo: !docente.activo }),
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      await fetchDocentes();
-      const nombre = docente.user
-        ? `${docente.user.nombre} ${docente.user.apellido}`
-        : docente.codigo_docente;
-      addToast(
-        docente.activo ? 'warning' : 'success',
-        docente.activo ? 'Docente suspendido' : 'Docente activado',
-        `"${nombre}" fue ${docente.activo ? 'suspendido' : 'activado'}`
-      );
-    } catch (e: any) {
-      addToast('error', 'No se pudo cambiar el estado', e.message);
-    }
-  };
-
-  /* ── Eliminar */
-  const handleDelete = (id: number | undefined) => {
+  const openConfirm = (id: number | undefined) => {
     if (!id) return;
-    const d = docentes.find(x => x.id === id);
-    const nombre = d?.user ? `${d.user.nombre} ${d.user.apellido}` : d?.codigo_docente ?? String(id);
+    const docente = docentes.find((d) => d.id === id);
+    const nombre = docente?.user
+      ? `${docente.user.nombre} ${docente.user.apellido}`
+      : docente?.codigo_docente ?? String(id);
     setConfirm({ open: true, id, msg: `¿Deseas eliminar permanentemente al docente "${nombre}"?` });
   };
+
   const confirmDelete = async () => {
     const id = confirm.id;
+    const docente = docentes.find((d) => d.id === id);
+    const nombre = docente?.user
+      ? `${docente.user.nombre} ${docente.user.apellido}`
+      : docente?.codigo_docente ?? String(id);
     setConfirm({ open: false, msg: '' });
     if (!id) return;
-    const d = docentes.find(x => x.id === id);
-    const nombre = d?.user ? `${d.user.nombre} ${d.user.apellido}` : d?.codigo_docente ?? String(id);
-    try {
-      const res = await fetch(`${BASE}/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      await fetchDocentes();
-      addToast('info', 'Docente eliminado', `"${nombre}" fue eliminado`);
-    } catch (e: any) {
-      addToast('error', 'No se pudo eliminar', e.message);
-    }
+    await handleDelete(id, nombre);
   };
-
-  /* ── Filtro */
-  const filtered = docentes.filter((d) => {
-    const term = searchTerm.toLowerCase();
-    const nombre = `${d.user?.nombre ?? ''} ${d.user?.apellido ?? ''}`.toLowerCase();
-    return (
-      d.codigo_docente.toLowerCase().includes(term) ||
-      (d.departamento ?? '').toLowerCase().includes(term) ||
-      nombre.includes(term) ||
-      (d.user?.email ?? '').toLowerCase().includes(term)
-    );
-  });
-
-  /* ── Render */
   return (
     <div className="p-4 sm:p-6 md:p-8 min-h-full bg-[#081028] text-white">
       <ToastContainer toasts={toasts} onRemove={removeToast} />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { CalendarDays, X } from 'lucide-react';
-import type { Docente, Disponibilidad } from './ProfesoresLayout';
+import type { Docente, Disponibilidad } from './logic/types';
 
 interface DisponibilidadViewModalProps {
   isOpen:  boolean;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { RefreshCw, Trash2, CalendarDays, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import type { Docente, Disponibilidad } from './ProfesoresLayout';
+import type { Docente, Disponibilidad } from './logic/types';
 import { API_CONFIG } from '../../../services/config';
 
 interface DisponibilidadModalProps {

@@ -5,7 +5,7 @@ import {
   Users, Building2, GraduationCap,
 } from 'lucide-react';
 import { API_CONFIG } from '../../../services/config';
-import type { Docente } from './ProfesoresLayout';
+import type { Docente } from './logic/types';
 
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface Horario {

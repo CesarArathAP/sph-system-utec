@@ -1,16 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Search, UserPlus, CheckCircle, RefreshCw, ChevronRight, ChevronLeft, GraduationCap, X } from 'lucide-react';
-import type { Docente } from './ProfesoresLayout';
+import { INPUT_CLASS, LABEL_CLASS } from './logic/constants';
+import type { Docente, ProfesoresModalProps } from './logic/types';
 import { API_CONFIG } from '../../../services/config';
-
-/* ─── Props ─────────────────────────────────────────────────── */
-interface ProfesoresModalProps {
-  isOpen: boolean;
-  docente: Docente | null;
-  onClose: () => void;
-  onSave: (docente: Docente) => void;
-}
 
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface UserResult {
@@ -19,15 +12,10 @@ interface UserResult {
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = API_CONFIG.BASE_URL;
-
-/* ─── Estilos compartidos ───────────────────────────────────── */
-const INPUT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm ' +
-              'placeholder:text-white/40 outline-none transition focus:border-white/60 focus:bg-white/20';
-const LABEL = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
+const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
 
 const emptyUser    = { nombre: '', apellido: '', email: '', password: '' };
-const emptyDocente = { codigo_docente: '', departamento: '', horas_maximas_semana: 20 };
+
 
 /* ════════════════════════════════════════════════════════════════
    FORM EDITAR
@@ -72,21 +60,21 @@ function EditDocenteForm({ docente, onSave, onClose }:
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className={LABEL}>Código docente <span className="text-red-400">*</span></label>
+          <label className={LABEL_CLASS}>Código docente <span className="text-red-400">*</span></label>
           <input name="codigo_docente" value={form.codigo_docente} onChange={handleChange}
-            required placeholder="ej. DOC-001" className={INPUT} />
+            required placeholder="ej. DOC-001" className={INPUT_CLASS} />
         </div>
         <div>
-          <label className={LABEL}>Hrs máx / semana</label>
+          <label className={LABEL_CLASS}>Hrs máx / semana</label>
           <input name="horas_maximas_semana" type="number" min={1} max={60}
-            value={form.horas_maximas_semana} onChange={handleChange} className={INPUT} />
+            value={form.horas_maximas_semana} onChange={handleChange} className={INPUT_CLASS} />
         </div>
       </div>
 
       <div>
-        <label className={LABEL}>Departamento</label>
+        <label className={LABEL_CLASS}>Departamento</label>
         <input name="departamento" value={form.departamento} onChange={handleChange}
-          placeholder="ej. Ing. Sistemas" className={INPUT} />
+          placeholder="ej. Ing. Sistemas" className={INPUT_CLASS} />
       </div>
 
       <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3">
@@ -235,7 +223,7 @@ function CreateDocenteWizard({ onSave, onClose }:
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
             <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
               placeholder="Nombre, apellido o email..." autoFocus
-              className={`${INPUT} pl-9`} />
+              className={`${INPUT_CLASS} pl-9`} />
             {searching && <RefreshCw size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 animate-spin" />}
           </div>
 
@@ -280,25 +268,25 @@ function CreateDocenteWizard({ onSave, onClose }:
           )}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={LABEL}>Nombre <span className="text-red-400">*</span></label>
+              <label className={LABEL_CLASS}>Nombre <span className="text-red-400">*</span></label>
               <input required value={newUser.nombre} placeholder="Juan"
-                onChange={e => setNewUser(p => ({ ...p, nombre: e.target.value }))} className={INPUT} />
+                onChange={e => setNewUser(p => ({ ...p, nombre: e.target.value }))} className={INPUT_CLASS} />
             </div>
             <div>
-              <label className={LABEL}>Apellido <span className="text-red-400">*</span></label>
+              <label className={LABEL_CLASS}>Apellido <span className="text-red-400">*</span></label>
               <input required value={newUser.apellido} placeholder="Pérez"
-                onChange={e => setNewUser(p => ({ ...p, apellido: e.target.value }))} className={INPUT} />
+                onChange={e => setNewUser(p => ({ ...p, apellido: e.target.value }))} className={INPUT_CLASS} />
             </div>
           </div>
           <div>
-            <label className={LABEL}>Email <span className="text-red-400">*</span></label>
+            <label className={LABEL_CLASS}>Email <span className="text-red-400">*</span></label>
             <input required type="email" value={newUser.email} placeholder="juan.perez@utec.edu.mx"
-              onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} className={INPUT} />
+              onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} className={INPUT_CLASS} />
           </div>
           <div>
-            <label className={LABEL}>Contraseña <span className="text-red-400">*</span> (mín. 8 caracteres)</label>
+            <label className={LABEL_CLASS}>Contraseña <span className="text-red-400">*</span> (mín. 8 caracteres)</label>
             <input required type="password" minLength={8} value={newUser.password} placeholder="••••••••"
-              onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} className={INPUT} />
+              onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} className={INPUT_CLASS} />
           </div>
           <p className="text-white/40 text-xs">El rol se asignará automáticamente como <strong className="text-white/60">Docente</strong>.</p>
         </form>
@@ -350,22 +338,22 @@ function CreateDocenteWizard({ onSave, onClose }:
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className={LABEL}>Código docente <span className="text-red-400">*</span></label>
+          <label className={LABEL_CLASS}>Código docente <span className="text-red-400">*</span></label>
           <input required value={docenteForm.codigo_docente} placeholder="ej. DOC-001"
-            onChange={e => setDocenteForm(p => ({ ...p, codigo_docente: e.target.value }))} className={INPUT} />
+            onChange={e => setDocenteForm(p => ({ ...p, codigo_docente: e.target.value }))} className={INPUT_CLASS} />
         </div>
         <div>
-          <label className={LABEL}>Hrs máx / semana</label>
+          <label className={LABEL_CLASS}>Hrs máx / semana</label>
           <input type="number" min={1} max={60} value={docenteForm.horas_maximas_semana}
             onChange={e => setDocenteForm(p => ({ ...p, horas_maximas_semana: parseInt(e.target.value) || 0 }))}
-            className={INPUT} />
+            className={INPUT_CLASS} />
         </div>
       </div>
 
       <div>
-        <label className={LABEL}>Departamento</label>
+        <label className={LABEL_CLASS}>Departamento</label>
         <input value={docenteForm.departamento} placeholder="ej. Ing. Sistemas"
-          onChange={e => setDocenteForm(p => ({ ...p, departamento: e.target.value }))} className={INPUT} />
+          onChange={e => setDocenteForm(p => ({ ...p, departamento: e.target.value }))} className={INPUT_CLASS} />
       </div>
 
       <div className="flex justify-between items-center pt-2 border-t border-white/15">
