@@ -5,6 +5,8 @@ import {
     BarChart3, BookCopy, Layers,
 } from 'lucide-react';
 import { API_CONFIG } from '../../services/config';
+import SetupGuideAlert from '../modules/horarios/SetupGuideAlert';
+import { useScheduleSetupStatus } from '../modules/horarios/logic/useScheduleSetupStatus';
 
 const BASE = API_CONFIG.BASE_URL;
 const token = () => localStorage.getItem('auth_token') ?? '';
@@ -86,6 +88,8 @@ export default function HomeDashboard() {
     const [stats, setStats] = useState<Stats | null>(null);
     const [aulaBreakdown, setAulaBreakdown] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
+    
+    const { status: setupStatus } = useScheduleSetupStatus();
 
     const user = (() => {
         try { return JSON.parse(localStorage.getItem('current_user') ?? 'null'); }
@@ -149,6 +153,9 @@ export default function HomeDashboard() {
                     </p>
                 </div>
             </div>
+
+            {/* ── Setup Guide Alert ── */}
+            {setupStatus && <SetupGuideAlert status={setupStatus} />}
 
             {/* ── KPIs principales ── */}
             <section className="space-y-4">
