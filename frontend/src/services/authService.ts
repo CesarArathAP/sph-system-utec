@@ -22,7 +22,16 @@ class AuthService {
       const json = await response.json();
 
       if (!response.ok) {
-        return { message: json.detail || 'Credenciales incorrectas' };
+        const serverMsg = typeof json.detail === 'string' ? json.detail : null;
+        if (response.status === 401)
+          return { message: serverMsg ?? 'Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.' };
+        if (response.status === 403)
+          return { message: serverMsg ?? 'Tu cuenta está inactiva o no tiene acceso al sistema. Contacta al administrador.' };
+        if (response.status === 422)
+          return { message: serverMsg ?? 'El formato del correo o la contraseña no es válido.' };
+        if (response.status >= 500)
+          return { message: serverMsg ?? 'El servidor tuvo un problema al procesar tu solicitud. Intenta de nuevo más tarde.' };
+        return { message: serverMsg ?? 'No se pudo iniciar sesión. Intenta de nuevo.' };
       }
 
       // Guardar token en localStorage
@@ -39,7 +48,9 @@ class AuthService {
       return json;
     } catch (error) {
       return {
-        message: error instanceof Error ? error.message : 'Error en la autenticación',
+        message: error instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (error instanceof Error ? error.message : 'Ocurrió un error inesperado al iniciar sesión.'),
       };
     }
   }
@@ -66,7 +77,6 @@ class AuthService {
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.REGISTER}`;
-      console.log('[AuthService] register URL:', url); // debug
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,15 +86,22 @@ class AuthService {
       const json = await response.json();
 
       if (!response.ok) {
-        return {
-          message: json.detail || `Error: ${response.statusText}`,
-        };
+        const serverMsg = typeof json.detail === 'string' ? json.detail : null;
+        if (response.status === 409)
+          return { message: serverMsg ?? `El correo "${data.email}" ya está registrado. Inicia sesión o usa otro correo.` };
+        if (response.status === 422)
+          return { message: serverMsg ?? 'Algunos datos del formulario no son válidos. Revisa que el correo sea correcto y que la contraseña cumpla los requisitos.' };
+        if (response.status >= 500)
+          return { message: serverMsg ?? 'El servidor tuvo un problema al crear tu cuenta. Intenta de nuevo más tarde.' };
+        return { message: serverMsg ?? 'No se pudo crear la cuenta. Intenta de nuevo.' };
       }
 
       return json;
     } catch (error) {
       return {
-        message: error instanceof Error ? error.message : 'Error en el registro',
+        message: error instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (error instanceof Error ? error.message : 'Ocurrió un error inesperado al registrar la cuenta.'),
       };
     }
   }
