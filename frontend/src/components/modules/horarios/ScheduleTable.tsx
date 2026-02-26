@@ -296,8 +296,19 @@ export default function ScheduleTable({ onAssignClick, refreshKey = 0 }: Schedul
       ) : error ? (
         <div className="bg-red-500/5 border border-red-500/20 text-red-500 rounded-[3.5rem] p-16 text-center max-w-2xl mx-auto shadow-[0_0_60px_rgba(239,68,68,0.05)] animate-in zoom-in-95 backdrop-blur-md">
           <AlertCircle size={56} className="mx-auto mb-8 text-red-600/60" />
-          <p className="font-black text-2xl uppercase tracking-tighter mb-4">Error de Integridad</p>
-          <p className="text-sm opacity-40 leading-relaxed font-bold mb-10 max-w-md mx-auto">{error}</p>
+          <p className="font-black text-2xl uppercase tracking-tighter mb-3">
+            {error.includes('sesión') ? 'Sesión Expirada' :
+             error.includes('permisos') ? 'Acceso Restringido' :
+             error.includes('internet') ? 'Sin Conexión' :
+             'Error al Cargar Horarios'}
+          </p>
+          <p className="text-sm opacity-50 leading-relaxed font-bold mb-3 max-w-md mx-auto">{error}</p>
+          <p className="text-xs opacity-30 font-bold uppercase tracking-widest mb-10">
+            {error.includes('sesión') ? 'Cierra sesión y vuelve a iniciar para continuar.' :
+             error.includes('permisos') ? 'Contacta al administrador del sistema.' :
+             error.includes('internet') ? 'Verifica tu conexión y reintenta.' :
+             'Puedes intentar sincronizar de nuevo o contactar soporte.'}
+          </p>
           <button onClick={fetchHorarios} className="px-10 py-4 bg-red-600 hover:bg-red-500 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-red-900/20">Reintentar Conexión</button>
         </div>
       ) : (
