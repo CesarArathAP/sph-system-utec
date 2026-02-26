@@ -1,67 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Building2 } from 'lucide-react';
-
-interface Aula {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  capacidad: number;
-  tipo: string;
-  edificio: string;
-  piso: number | null;
-  equipamiento: string;
-  activo: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface AulasModalProps {
-  isOpen: boolean;
-  aula: Aula | null;
-  onClose: () => void;
-  onSave: (aula: Aula) => void;
-}
-
-/* ── Clases reutilizables ── */
-const INPUT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm ' +
-              'placeholder:text-white/40 outline-none transition ' +
-              'focus:border-white/60 focus:bg-white/20';
-const LABEL = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
+import { useAulasForm } from './logic/useAulasForm';
+import type { AulasModalProps } from './logic/types';
+import { INPUT, LABEL, TIPO_OPTIONS } from './logic/constants';
 
 export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModalProps) {
-  const emptyForm: Aula = {
-    codigo: '', nombre: '', capacidad: 0,
-    tipo: '', edificio: '', piso: null, equipamiento: '', activo: true,
-  };
-
-  const [formData, setFormData] = useState<Aula>(emptyForm);
-
-  useEffect(() => {
-    setFormData(aula ?? emptyForm);
-  }, [aula, isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, type } = e.target;
-    const value = type === 'checkbox'
-      ? (e.target as HTMLInputElement).checked
-      : e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'piso'
-        ? (value === '' || value === '0' ? null : parseInt(value as string))
-        : name === 'capacidad'
-          ? (parseInt(value as string) || 1)
-          : value,
-    }));
-  };
+  const { formData, isEditing, handleChange } = useAulasForm(isOpen, aula);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
   };
-
-  const isEditing = !!aula?.id;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -153,15 +103,18 @@ export default function AulasModal({ isOpen, aula, onClose, onSave }: AulasModal
               <label className={LABEL}>Tipo</label>
               <select
                 name="tipo"
-                value={formData.tipo} onChange={handleChange}
+                value={formData.tipo}
+                onChange={handleChange}
                 required
-                className={`${INPUT} cursor-pointer appearance-none`}
-              >
-                <option value="" className="bg-[#0d2f7a] text-white">Selecciona un tipo</option>
-                <option value="teoria" className="bg-[#0d2f7a] text-white">Teoría</option>
-                <option value="laboratorio" className="bg-[#0d2f7a] text-white">Laboratorio</option>
-                <option value="computo" className="bg-[#0d2f7a] text-white">Cómputo</option>
-                <option value="auditorio" className="bg-[#0d2f7a] text-white">Auditorio</option>
+                className={`${INPUT} cursor-pointer appearance-none`}>
+                <option value="" className="bg-[#0d2f7a] text-white">
+                  Selecciona un tipo
+                </option>
+                {TIPO_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value} className="bg-[#0d2f7a] text-white">
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
 

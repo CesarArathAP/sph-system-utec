@@ -1,83 +1,63 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Pencil, Trash2, RefreshCw, Building2, PowerOff, Power,
-         CheckCircle2, XCircle, AlertTriangle, X, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  Building2,
+  PowerOff,
+  Power,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  X,
+  Info,
+} from 'lucide-react';
 import AulasModal from './AulasModal';
 import { API_CONFIG } from '../../../services/config';
+import { useAulasTable } from './logic/useAulasTable';
+import { useAulasActions } from './logic/useAulasActions';
+import type { Aula, Toast, ToastType } from './logic/types';
+import { TIPO_COLORS } from './logic/constants';
 
-/* ─── Tipos ─────────────────────────────────────────────────── */
-interface Aula {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  capacidad: number;
-  tipo: string;
-  edificio: string;
-  piso: number | null;
-  equipamiento: string;
-  activo: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-type ToastType = 'success' | 'error' | 'warning' | 'info';
-interface Toast { id: number; type: ToastType; title: string; message: string; }
-
-/* ─── Toast Component — diseño profesional ──────────────────── */
 const toastAccent: Record<ToastType, string> = {
   success: 'bg-green-500',
-  error:   'bg-red-500',
+  error: 'bg-red-500',
   warning: 'bg-amber-500',
-  info:    'bg-blue-500',
+  info: 'bg-blue-500',
 };
+
 const toastIconColor: Record<ToastType, string> = {
   success: 'text-green-400',
-  error:   'text-red-400',
+  error: 'text-red-400',
   warning: 'text-amber-400',
-  info:    'text-blue-400',
+  info: 'text-blue-400',
 };
+
 const toastIconEl: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2  size={18} />,
-  error:   <XCircle       size={18} />,
+  success: <CheckCircle2 size={18} />,
+  error: <XCircle size={18} />,
   warning: <AlertTriangle size={18} />,
-  info:    <Info          size={18} />,
-};
-const toastLabel: Record<ToastType, string> = {
-  success: 'Éxito',
-  error:   'Error',
-  warning: 'Advertencia',
-  info:    'Información',
+  info: <Info size={18} />,
 };
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
   return (
     <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-3 w-[320px] pointer-events-none">
-      {toasts.map((t) => (
+      {toasts.map(t => (
         <div
           key={t.id}
-          className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto
-                     bg-slate-900 border border-slate-700"
-        >
-          {/* Barra lateral de color */}
+          className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto bg-slate-900 border border-slate-700">
           <div className={`w-1 shrink-0 ${toastAccent[t.type]}`} />
-
-          {/* Ícono */}
-          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>
-            {toastIconEl[t.type]}
-          </div>
-
-          {/* Contenido */}
+          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>{toastIconEl[t.type]}</div>
           <div className="flex-1 py-3 pr-2 min-w-0">
             <p className="text-white text-sm font-semibold leading-tight">{t.title}</p>
-            {t.message && (
-              <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>
-            )}
+            {t.message && <p className="text-slate-400 text-xs mt-1 leading-snug">{t.message}</p>}
           </div>
-
-          {/* Cerrar */}
           <button
             onClick={() => onRemove(t.id)}
-            className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start"
-          >
+            className="px-3 pt-3 text-slate-500 hover:text-white transition cursor-pointer self-start">
             <X size={14} />
           </button>
         </div>
@@ -86,17 +66,22 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   );
 }
 
-/* ─── Confirm Dialog — diseño profesional ───────────────────── */
 function ConfirmDialog({
-  open, message, onConfirm, onCancel,
-}: { open: boolean; message: string; onConfirm: () => void; onCancel: () => void }) {
+  open,
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4
-                      border border-gray-200">
-        {/* Cabecera */}
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 border border-gray-200">
         <div className="flex items-start gap-4 mb-4">
           <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-100 shrink-0">
             <Trash2 size={20} className="text-red-600" />
@@ -106,21 +91,15 @@ function ConfirmDialog({
             <p className="text-gray-500 text-sm mt-1 leading-snug">{message}</p>
           </div>
         </div>
-        {/* Botones */}
         <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700
-                       hover:bg-gray-50 text-sm font-medium transition cursor-pointer"
-          >
+            className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium transition cursor-pointer">
             Cancelar
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white
-                       text-sm font-semibold transition cursor-pointer
-                       shadow-[0_2px_8px_rgba(220,38,38,0.35)]"
-          >
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition cursor-pointer shadow-[0_2px_8px_rgba(220,38,38,0.35)]">
             Sí, eliminar
           </button>
         </div>
@@ -129,95 +108,40 @@ function ConfirmDialog({
   );
 }
 
-/* ─── Helpers ───────────────────────────────────────────────── */
-function toBackend(a: Aula) {
-  return {
-    codigo_aula: a.codigo,
-    nombre: a.nombre,
-    capacidad: a.capacidad || 1,
-    tipo: a.tipo,
-    edificio: a.edificio || null,
-    piso: (a.piso && a.piso > 0) ? a.piso : null,
-    equipamiento: a.equipamiento || null,
-    activo: a.activo,
-  };
-}
-function fromBackend(b: any): Aula {
-  return {
-    id: String(b.id),
-    codigo: b.codigo_aula,
-    nombre: b.nombre,
-    capacidad: b.capacidad,
-    tipo: (b.tipo ?? '').toLowerCase(),
-    edificio: b.edificio ?? '',
-    piso: b.piso ?? null,
-    equipamiento: b.equipamiento ?? '',
-    activo: b.activo ?? true,
-    createdAt: b.created_at,
-    updatedAt: b.updated_at,
-  };
-}
-function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = `${API_CONFIG.BASE_URL}/aulas`;
-
-const tipoColors: Record<string, string> = {
-  normal:      'bg-blue-100   text-blue-700   border border-blue-200',
-  teoria:      'bg-blue-100   text-blue-700   border border-blue-200',
-  computo:     'bg-cyan-100   text-cyan-700   border border-cyan-200',
-  laboratorio: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-  auditorio:   'bg-purple-100 text-purple-700  border border-purple-200',
-};
-
-/* ─── Componente principal ──────────────────────────────────── */
 export default function AulasLayout() {
-  const [aulas, setAulas]             = useState<Aula[]>([]);
-  const [total, setTotal]             = useState(0);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
-  const [searchTerm, setSearchTerm]   = useState('');
+  // Table state & logic
+  const { aulas, filtered, total, loading, error, searchTerm, setSearchTerm, fetchAulas } = useAulasTable();
+
+  // Actions & toast
+  const { toasts, removeToast, addToast, confirm, handleToggleActivo, handleDelete, confirmDelete, cancelDelete } =
+    useAulasActions(fetchAulas);
+
+  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAula, setSelectedAula] = useState<Aula | null>(null);
-  const [toasts, setToasts]           = useState<Toast[]>([]);
-  const [confirm, setConfirm]         = useState<{ open: boolean; id?: string; msg: string }>({ open: false, msg: '' });
-
-  /* ── Toast helpers ── */
-  const addToast = (type: ToastType, title: string, message = '') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
-  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
-
-  /* ── Fetch ── */
-  const fetchAulas = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`${BASE}?page=1&page_size=100`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      setAulas((data.aulas ?? []).map(fromBackend));
-      setTotal(data.total ?? 0);
-    } catch (e: any) {
-      setError(e.message ?? 'Error al cargar aulas');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchAulas(); }, [fetchAulas]);
 
   /* ── Guardar ── */
   const handleSave = async (aula: Aula) => {
     const isNew = !selectedAula?.id;
     try {
       const method = isNew ? 'POST' : 'PUT';
-      const url    = isNew ? BASE : `${BASE}/${selectedAula!.id}`;
+      const url = isNew ? `${API_CONFIG.BASE_URL}/aulas` : `${API_CONFIG.BASE_URL}/aulas/${selectedAula!.id}`;
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(toBackend(aula)),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth_token') ?? ''}`,
+        },
+        body: JSON.stringify({
+          codigo_aula: aula.codigo,
+          nombre: aula.nombre,
+          capacidad: aula.capacidad || 1,
+          tipo: aula.tipo,
+          edificio: aula.edificio || null,
+          piso: aula.piso && aula.piso > 0 ? aula.piso : null,
+          equipamiento: aula.equipamiento || null,
+          activo: aula.activo,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
@@ -226,7 +150,8 @@ export default function AulasLayout() {
       }
       setIsModalOpen(false);
       await fetchAulas();
-      addToast('success',
+      addToast(
+        'success',
         isNew ? 'Aula creada' : 'Aula actualizada',
         isNew ? `"${aula.nombre}" fue registrada exitosamente` : `"${aula.nombre}" fue actualizada`
       );
@@ -235,59 +160,6 @@ export default function AulasLayout() {
     }
   };
 
-  /* ── Toggle activo ── */
-  const handleToggleActivo = async (aula: Aula) => {
-    try {
-      const res = await fetch(`${BASE}/${aula.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(toBackend({ ...aula, activo: !aula.activo })),
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      await fetchAulas();
-      addToast(
-        aula.activo ? 'warning' : 'success',
-        aula.activo ? 'Aula suspendida' : 'Aula activada',
-        `"${aula.nombre}" fue ${aula.activo ? 'suspendida' : 'activada'}`
-      );
-    } catch (e: any) {
-      addToast('error', 'No se pudo actualizar', e.message);
-    }
-  };
-
-  /* ── Eliminar ── */
-  const handleDelete = (id: string | undefined) => {
-    if (!id) return;
-    const aula = aulas.find(a => a.id === id);
-    setConfirm({ open: true, id, msg: `¿Deseas eliminar permanentemente el aula "${aula?.nombre ?? id}"?` });
-  };
-  const confirmDelete = async () => {
-    const id = confirm.id;
-    setConfirm({ open: false, msg: '' });
-    if (!id) return;
-    const aula = aulas.find(a => a.id === id);
-    try {
-      const res = await fetch(`${BASE}/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      await fetchAulas();
-      addToast('info', 'Aula eliminada', `"${aula?.nombre ?? id}" fue eliminada`);
-    } catch (e: any) {
-      addToast('error', 'No se pudo eliminar', e.message);
-    }
-  };
-
-  /* ── Filtro ── */
-  const filtered = aulas.filter(a =>
-    a.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (a.edificio ?? '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  /* ── Render ── */
   return (
     <div className="p-4 sm:p-6 md:p-8 min-h-full bg-[#081028] text-white">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -295,10 +167,8 @@ export default function AulasLayout() {
         open={confirm.open}
         message={confirm.msg}
         onConfirm={confirmDelete}
-        onCancel={() => setConfirm({ open: false, msg: '' })}
+        onCancel={cancelDelete}
       />
-
-      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center rounded-xl
@@ -393,8 +263,9 @@ export default function AulasLayout() {
                     <td className="px-4 py-3 font-mono font-semibold text-blue-400 text-xs">{aula.codigo}</td>
                     <td className="px-4 py-3 text-white max-w-[180px] truncate text-sm" title={aula.nombre}>{aula.nombre}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize
-                                        ${tipoColors[aula.tipo?.toLowerCase()] ?? 'bg-white/10 text-white/50 border border-white/10'}`}>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize
+                                        ${TIPO_COLORS[aula.tipo?.toLowerCase()] ?? 'bg-white/10 text-white/50 border border-white/10'}`}>
                         {aula.tipo || '—'}
                       </span>
                     </td>
