@@ -28,8 +28,14 @@ export function useConflictos() {
       if (res.ok) {
         const data = await res.json();
         setConflictos(data.conflictos ?? []);
+      } else if (res.status === 401) {
+        // Se ignora silenciosamente para no interrumpir la vista principal
+        setConflictos([]);
+      } else {
+        setConflictos([]);
       }
     } catch {
+      // Sin conexión: se mantiene lista vacía silenciosamente
       setConflictos([]);
     } finally {
       setLoadingConf(false);
@@ -46,25 +52,36 @@ export function useConflictos() {
         await fetchConflictos();
         addToast({
           type: 'success',
-          title: 'Resuelto',
-          message: 'El conflicto ha sido marcado como resuelto.',
-          duration: 3000,
+          title: '✓ Conflicto resuelto',
+          message: 'El conflicto ha sido marcado como resuelto exitosamente.',
+          duration: 3500,
         });
+      } else {
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        let msg = 'No se pudo resolver el conflicto.';
+        if (res.status === 401) msg = 'Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.';
+        else if (res.status === 403) msg = 'No tienes permisos para resolver este conflicto.';
+        else if (res.status === 404) msg = 'El conflicto ya no existe o fue eliminado previamente.';
+        else if (res.status >= 500) msg = serverMsg ?? 'El servidor tuvo un error al resolver el conflicto. Intenta de nuevo.';
+        else if (serverMsg) msg = serverMsg;
+        addToast({ type: 'error', title: '✗ No se pudo resolver', message: msg, duration: 5000 });
       }
-    } catch {
+    } catch (e) {
       addToast({
         type: 'error',
-        title: 'Error',
-        message: 'No se pudo resolver el conflicto.',
-        duration: 3000,
+        title: '✗ Error de conexión',
+        message: 'No se pudo conectar con el servidor. Verifica tu conexión a internet.',
+        duration: 4000,
       });
     }
   };
 
   const clearConflicts = async (todos = false) => {
+    const accion = todos ? 'todo el historial de conflictos' : 'los conflictos resueltos';
     const result = confirm(
       todos
-        ? '¿Está seguro que desea borrar todo el historial de conflictos?'
+        ? '¿Está seguro que desea borrar todo el historial de conflictos? Esta acción no se puede deshacer.'
         : '¿Está seguro que desea limpiar los conflictos resueltos?'
     );
 
@@ -80,16 +97,26 @@ export function useConflictos() {
         await fetchConflictos();
         addToast({
           type: 'success',
-          title: 'Historial Limpio',
-          duration: 3000,
+          title: '✓ Historial limpiado',
+          message: `Se eliminó ${accion} exitosamente.`,
+          duration: 3500,
         });
+      } else {
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        let msg = `No se pudo limpiar ${accion}.`;
+        if (res.status === 401) msg = 'Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.';
+        else if (res.status === 403) msg = 'No tienes permisos para limpiar el historial de conflictos.';
+        else if (res.status >= 500) msg = serverMsg ?? 'El servidor tuvo un error al limpiar el historial. Intenta de nuevo.';
+        else if (serverMsg) msg = serverMsg;
+        addToast({ type: 'error', title: '✗ No se pudo limpiar', message: msg, duration: 5000 });
       }
     } catch {
       addToast({
         type: 'error',
-        title: 'Error',
-        message: 'No se pudo limpiar el historial.',
-        duration: 3000,
+        title: '✗ Error de conexión',
+        message: 'No se pudo conectar con el servidor. Verifica tu conexión a internet.',
+        duration: 4000,
       });
     } finally {
       setClearing(false);
