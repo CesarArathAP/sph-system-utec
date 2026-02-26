@@ -1,45 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Pencil, Trash2, RefreshCw, Users, PowerOff, Power,
-         CheckCircle2, XCircle, AlertTriangle, X, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Search, Pencil, Trash2, RefreshCw, Users, PowerOff, Power, CheckCircle2, XCircle, AlertTriangle, X, Info } from 'lucide-react';
 import GruposModal from './GruposModal';
-import { API_CONFIG } from '../../../services/config';
+import { useGruposTable } from './logic/useGruposTable';
+import { useGruposActions } from './logic/useGruposActions';
+import { TOAST_ACCENT, TOAST_ICON_COLOR, TURNO_COLORS } from './logic/constants';
+import type { Grupo, Toast } from './logic/types';
 
-/* ─── Tipos ─────────────────────────────────────────────────── */
-interface Grupo {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  carrera: string;
-  semestre: number;
-  turno: string;
-  numeroEstudiantes: number;
-  cicloEscolar: string;
-  activo: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-type ToastType = 'success' | 'error' | 'warning' | 'info';
-interface Toast { id: number; type: ToastType; title: string; message: string; }
-
-/* ─── Toast Component — diseño profesional ──────────────────── */
-const toastAccent: Record<ToastType, string> = {
-  success: 'bg-green-500',
-  error:   'bg-red-500',
-  warning: 'bg-amber-500',
-  info:    'bg-blue-500',
-};
-const toastIconColor: Record<ToastType, string> = {
-  success: 'text-green-400',
-  error:   'text-red-400',
-  warning: 'text-amber-400',
-  info:    'text-blue-400',
-};
-const toastIconEl: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2  size={18} />,
-  error:   <XCircle       size={18} />,
+/* ── Toast Component ────────────────────────────────────────────── */
+const toastIconEl: Record<string, React.ReactNode> = {
+  success: <CheckCircle2 size={18} />,
+  error: <XCircle size={18} />,
   warning: <AlertTriangle size={18} />,
-  info:    <Info          size={18} />,
+  info: <Info size={18} />,
 };
 
 function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
@@ -51,8 +23,8 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
           className="flex overflow-hidden rounded-2xl shadow-2xl pointer-events-auto
                      bg-slate-900 border border-slate-700"
         >
-          <div className={`w-1 shrink-0 ${toastAccent[t.type]}`} />
-          <div className={`flex items-start pt-3.5 px-3 ${toastIconColor[t.type]}`}>
+          <div className={`w-1 shrink-0 ${TOAST_ACCENT[t.type]}`} />
+          <div className={`flex items-start pt-3.5 px-3 ${TOAST_ICON_COLOR[t.type]}`}>
             {toastIconEl[t.type]}
           </div>
           <div className="flex-1 py-3 pr-2 min-w-0">
@@ -73,16 +45,25 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   );
 }
 
-/* ─── Confirm Dialog — diseño profesional ───────────────────── */
 function ConfirmDialog({
-  open, message, onConfirm, onCancel,
-}: { open: boolean; message: string; onConfirm: () => void; onCancel: () => void }) {
+  open,
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4
-                      border border-gray-200">
+      <div
+        className="relative z-10 bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4
+                      border border-gray-200"
+      >
         <div className="flex items-start gap-4 mb-4">
           <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-100 shrink-0">
             <Trash2 size={20} className="text-red-600" />
@@ -114,158 +95,28 @@ function ConfirmDialog({
   );
 }
 
-/* ─── Helpers ───────────────────────────────────────────────── */
-function toBackend(g: Grupo) {
-  return {
-    codigo_grupo: g.codigo,
-    nombre: g.nombre,
-    carrera: g.carrera,
-    semestre: g.semestre,
-    turno: g.turno,
-    num_estudiantes: g.numeroEstudiantes,
-    ciclo_escolar: g.cicloEscolar,
-    activo: g.activo,
-  };
-}
-function fromBackend(b: any): Grupo {
-  return {
-    id: String(b.id),
-    codigo: b.codigo_grupo,
-    nombre: b.nombre,
-    carrera: b.carrera,
-    semestre: b.semestre,
-    turno: b.turno,
-    numeroEstudiantes: b.num_estudiantes,
-    cicloEscolar: b.ciclo_escolar,
-    activo: b.activo ?? true,
-    createdAt: b.created_at,
-    updatedAt: b.updated_at,
-  };
-}
-function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = `${API_CONFIG.BASE_URL}/grupos`;
-
-const turnoColors: Record<string, string> = {
-  matutino:   'bg-amber-100  text-amber-700  border border-amber-200',
-  vespertino: 'bg-blue-100   text-blue-700   border border-blue-200',
-  nocturno:   'bg-indigo-100 text-indigo-700 border border-indigo-200',
-};
-
-/* ─── Componente principal ──────────────────────────────────── */
+/* ── Main Component ────────────────────────────────────────────── */
 export default function GruposLayout() {
-  const [grupos, setGrupos]           = useState<Grupo[]>([]);
-  const [total, setTotal]             = useState(0);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
-  const [searchTerm, setSearchTerm]   = useState('');
+  const { grupos, total, loading, error, searchTerm, setSearchTerm, filtered, fetchGrupos } = useGruposTable();
+  const { toasts, removeToast, handleSave, handleToggleActivo, handleDelete } = useGruposActions(fetchGrupos);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
-  const [toasts, setToasts]           = useState<Toast[]>([]);
-  const [confirm, setConfirm]         = useState<{ open: boolean; id?: string; msg: string }>({ open: false, msg: '' });
+  const [confirm, setConfirm] = useState<{ open: boolean; id?: string; msg: string }>({ open: false, msg: '' });
 
-  /* ── Toast helpers ── */
-  const addToast = (type: ToastType, title: string, message = '') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, title, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
-  const removeToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
-
-  /* ── Fetch ── */
-  const fetchGrupos = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`${BASE}?page=1&page_size=100`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      setGrupos((data.grupos ?? []).map(fromBackend));
-      setTotal(data.total ?? 0);
-    } catch (e: any) {
-      setError(e.message ?? 'Error al cargar grupos');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchGrupos(); }, [fetchGrupos]);
-
-  /* ── Guardar ── */
-  const handleSave = async (grupo: Grupo) => {
-    const isNew = !selectedGrupo?.id;
-    try {
-      const method = isNew ? 'POST' : 'PUT';
-      const url    = isNew ? BASE : `${BASE}/${selectedGrupo!.id}`;
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(toBackend(grupo)),
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      setIsModalOpen(false);
-      await fetchGrupos();
-      addToast('success',
-        isNew ? 'Grupo creado' : 'Grupo actualizado',
-        isNew ? `"${grupo.nombre}" fue registrado exitosamente` : `"${grupo.nombre}" fue actualizado`
-      );
-    } catch (e: any) {
-      addToast('error', 'No se pudo guardar', e.message);
-    }
-  };
-
-  /* ── Toggle activo ── */
-  const handleToggleActivo = async (grupo: Grupo) => {
-    try {
-      const res = await fetch(`${BASE}/${grupo.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(toBackend({ ...grupo, activo: !grupo.activo })),
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      await fetchGrupos();
-      addToast(
-        grupo.activo ? 'warning' : 'success',
-        grupo.activo ? 'Grupo suspendido' : 'Grupo activado',
-        `"${grupo.nombre}" fue ${grupo.activo ? 'suspendido' : 'activado'}`
-      );
-    } catch (e: any) {
-      addToast('error', 'No se pudo actualizar', e.message);
-    }
-  };
-
-  /* ── Eliminar ── */
-  const handleDelete = (id: string | undefined) => {
+  const openConfirm = (id: string | undefined) => {
     if (!id) return;
-    const grupo = grupos.find(g => g.id === id);
+    const grupo = grupos.find((g) => g.id === id);
     setConfirm({ open: true, id, msg: `¿Deseas eliminar permanentemente el grupo "${grupo?.nombre ?? id}"?` });
   };
+
   const confirmDelete = async () => {
     const id = confirm.id;
     setConfirm({ open: false, msg: '' });
     if (!id) return;
-    const grupo = grupos.find(g => g.id === id);
-    try {
-      const res = await fetch(`${BASE}/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      await fetchGrupos();
-      addToast('info', 'Grupo eliminado', `"${grupo?.nombre ?? id}" fue eliminado`);
-    } catch (e: any) {
-      addToast('error', 'No se pudo eliminar', e.message);
-    }
+    await handleDelete(id);
   };
 
-  /* ── Filtro ── */
-  const filtered = grupos.filter(g =>
-    g.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    g.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    g.carrera.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  /* ── Render ── */
   return (
     <div className="p-4 sm:p-6 md:p-8 min-h-full bg-[#081028] text-white">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -276,12 +127,14 @@ export default function GruposLayout() {
         onCancel={() => setConfirm({ open: false, msg: '' })}
       />
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center rounded-xl
+          <div
+            className="w-10 h-10 flex items-center justify-center rounded-xl
                           bg-[linear-gradient(145deg,#1e56d9,#0d3ab0)]
-                          shadow-[0_4px_16px_rgba(15,63,196,0.45)]">
+                          shadow-[0_4px_16px_rgba(15,63,196,0.45)]"
+          >
             <Users size={20} className="text-white" />
           </div>
           <div>
@@ -298,7 +151,10 @@ export default function GruposLayout() {
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
-            onClick={() => { setSelectedGrupo(null); setIsModalOpen(true); }}
+            onClick={() => {
+              setSelectedGrupo(null);
+              setIsModalOpen(true);
+            }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm text-white cursor-pointer
                        bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)]
                        hover:shadow-[0_4px_16px_rgba(15,63,196,0.45)]
@@ -310,14 +166,14 @@ export default function GruposLayout() {
         </div>
       </div>
 
-      {/* ── Buscador ── */}
+      {/* Search */}
       <div className="relative mb-5">
         <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-400" />
         <input
           type="text"
           placeholder="Buscar código, nombre, carrera..."
           value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5
                      text-sm text-white placeholder:text-white/30
                      focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent
@@ -325,7 +181,7 @@ export default function GruposLayout() {
         />
       </div>
 
-      {/* ── Loading ── */}
+      {/* Loading */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <RefreshCw size={28} className="animate-spin text-blue-500" />
@@ -333,7 +189,7 @@ export default function GruposLayout() {
         </div>
       )}
 
-      {/* ── Error ── */}
+      {/* Error */}
       {error && !loading && (
         <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20
                         text-red-400 rounded-xl px-4 py-3 text-sm mb-5">
@@ -342,20 +198,36 @@ export default function GruposLayout() {
         </div>
       )}
 
-      {/* ── Tabla ── */}
+      {/* Table */}
       {!loading && !error && (
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-x-auto">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
               <tr className="bg-white/[0.03] border-b border-white/10">
-                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Código</th>
-                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Nombre</th>
-                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Carrera</th>
-                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Semestre</th>
-                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Turno</th>
-                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Estudiantes</th>
-                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Estado</th>
-                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">Acciones</th>
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Código
+                </th>
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Nombre
+                </th>
+                <th className="text-left px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Carrera
+                </th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Semestre
+                </th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Turno
+                </th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Estudiantes
+                </th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Estado
+                </th>
+                <th className="text-center px-4 py-3 font-black text-white/30 whitespace-nowrap text-[10px] tracking-[0.2em] uppercase">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -369,28 +241,47 @@ export default function GruposLayout() {
                 filtered.map((grupo) => (
                   <tr key={grupo.id} className="hover:bg-white/[0.03] transition-colors">
                     <td className="px-4 py-3 font-mono font-semibold text-blue-400 text-xs">{grupo.codigo}</td>
-                    <td className="px-4 py-3 text-white max-w-[180px] truncate text-sm" title={grupo.nombre}>{grupo.nombre}</td>
-                    <td className="px-4 py-3 text-white/60 max-w-[180px] truncate text-sm" title={grupo.carrera}>{grupo.carrera}</td>
+                    <td className="px-4 py-3 text-white max-w-[180px] truncate text-sm" title={grupo.nombre}>
+                      {grupo.nombre}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-white/60 max-w-[180px] truncate text-sm"
+                      title={grupo.carrera}
+                    >
+                      {grupo.carrera}
+                    </td>
                     <td className="px-4 py-3 text-center text-white/70 text-sm">{grupo.semestre}°</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize
-                                        ${turnoColors[grupo.turno?.toLowerCase()] ?? 'bg-white/10 text-white/50 border border-white/10'}`}>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize
+                                        ${
+                                          TURNO_COLORS[grupo.turno?.toLowerCase()] ??
+                                          'bg-white/10 text-white/50 border border-white/10'
+                                        }`}
+                      >
                         {grupo.turno || '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-white/70 text-sm">{grupo.numeroEstudiantes}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold
-                                        ${grupo.activo
-                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
-                                          : 'bg-red-500/20   text-red-400   border border-red-500/20'}`}>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold
+                                        ${
+                                          grupo.activo
+                                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-red-500/20 text-red-400 border border-red-500/20'
+                                        }`}
+                      >
                         {grupo.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button
-                          onClick={() => { setSelectedGrupo(grupo); setIsModalOpen(true); }}
+                          onClick={() => {
+                            setSelectedGrupo(grupo);
+                            setIsModalOpen(true);
+                          }}
                           className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 transition cursor-pointer"
                           title="Editar"
                         >
@@ -405,7 +296,7 @@ export default function GruposLayout() {
                           {grupo.activo ? <PowerOff size={14} /> : <Power size={14} />}
                         </button>
                         <button
-                          onClick={() => handleDelete(grupo.id)}
+                          onClick={() => openConfirm(grupo.id)}
                           className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition cursor-pointer"
                           title="Eliminar"
                         >
@@ -421,12 +312,15 @@ export default function GruposLayout() {
         </div>
       )}
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       <GruposModal
         isOpen={isModalOpen}
         grupo={selectedGrupo}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
+        onSave={(grupo) => {
+          handleSave(grupo, selectedGrupo);
+          setIsModalOpen(false);
+        }}
       />
     </div>
   );

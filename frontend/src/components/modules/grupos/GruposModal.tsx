@@ -1,65 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Users } from 'lucide-react';
-
-interface Grupo {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  carrera: string;
-  semestre: number;
-  turno: string;
-  numeroEstudiantes: number;
-  cicloEscolar: string;
-  activo: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface GruposModalProps {
-  isOpen: boolean;
-  grupo: Grupo | null;
-  onClose: () => void;
-  onSave: (grupo: Grupo) => void;
-}
-
-/* ── Clases reutilizables ── */
-const INPUT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm ' +
-              'placeholder:text-white/40 outline-none transition ' +
-              'focus:border-white/60 focus:bg-white/20';
-const LABEL = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
+import { useGruposForm } from './logic/useGruposForm';
+import { INPUT_CLASS, LABEL_CLASS, TURNOS } from './logic/constants';
+import type { GruposModalProps } from './logic/types';
 
 export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposModalProps) {
-  const emptyForm: Grupo = {
-    codigo: '', nombre: '', carrera: '',
-    semestre: 1, turno: '', numeroEstudiantes: 0, cicloEscolar: '', activo: true,
-  };
-
-  const [formData, setFormData] = useState<Grupo>(emptyForm);
-
-  useEffect(() => {
-    setFormData(grupo ?? emptyForm);
-  }, [grupo, isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, type } = e.target;
-    const value = type === 'checkbox'
-      ? (e.target as HTMLInputElement).checked
-      : e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'semestre' || name === 'numeroEstudiantes'
-        ? parseInt(value as string) || 0
-        : value,
-    }));
-  };
+  const { formData, handleChange, isEditing } = useGruposForm(grupo, isOpen);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
   };
-
-  const isEditing = !!grupo?.id;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -104,83 +56,109 @@ export default function GruposModal({ isOpen, grupo, onClose, onSave }: GruposMo
 
             {/* Código */}
             <div>
-              <label className={LABEL}>Código</label>
+              <label className={LABEL_CLASS}>Código</label>
               <input
-                type="text" name="codigo"
-                value={formData.codigo} onChange={handleChange}
-                placeholder="ej. IDyGS-3A" required
-                className={INPUT}
+                type="text"
+                name="codigo"
+                value={formData.codigo}
+                onChange={handleChange}
+                placeholder="ej. IDyGS-3A"
+                required
+                className={INPUT_CLASS}
               />
             </div>
 
             {/* Nombre */}
             <div>
-              <label className={LABEL}>Nombre</label>
+              <label className={LABEL_CLASS}>Nombre</label>
               <input
-                type="text" name="nombre"
-                value={formData.nombre} onChange={handleChange}
-                placeholder="ej. Ingeniería en Desarrollo de Software - 3A" required
-                className={INPUT}
+                type="text"
+                name="nombre"
+                value={formData.nombre}
+                onChange={handleChange}
+                placeholder="ej. Ingeniería en Desarrollo de Software - 3A"
+                required
+                className={INPUT_CLASS}
               />
             </div>
 
             {/* Carrera */}
             <div>
-              <label className={LABEL}>Carrera</label>
+              <label className={LABEL_CLASS}>Carrera</label>
               <input
-                type="text" name="carrera"
-                value={formData.carrera} onChange={handleChange}
-                placeholder="ej. Ingeniería en Sistemas Computacionales" required
-                className={INPUT}
+                type="text"
+                name="carrera"
+                value={formData.carrera}
+                onChange={handleChange}
+                placeholder="ej. Ingeniería en Sistemas Computacionales"
+                required
+                className={INPUT_CLASS}
               />
             </div>
 
             {/* Semestre + Estudiantes */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={LABEL}>Semestre</label>
+                <label className={LABEL_CLASS}>Semestre</label>
                 <input
-                  type="number" name="semestre"
-                  value={formData.semestre} onChange={handleChange}
-                  placeholder="ej. 3" min="1" max="12" required
-                  className={INPUT}
+                  type="number"
+                  name="semestre"
+                  value={formData.semestre}
+                  onChange={handleChange}
+                  placeholder="ej. 3"
+                  min="1"
+                  max="12"
+                  required
+                  className={INPUT_CLASS}
                 />
               </div>
               <div>
-                <label className={LABEL}>N° de estudiantes</label>
+                <label className={LABEL_CLASS}>N° de estudiantes</label>
                 <input
-                  type="number" name="numeroEstudiantes"
-                  value={formData.numeroEstudiantes} onChange={handleChange}
-                  placeholder="ej. 28" min="0" required
-                  className={INPUT}
+                  type="number"
+                  name="numeroEstudiantes"
+                  value={formData.numeroEstudiantes}
+                  onChange={handleChange}
+                  placeholder="ej. 28"
+                  min="0"
+                  required
+                  className={INPUT_CLASS}
                 />
               </div>
             </div>
 
             {/* Turno */}
             <div>
-              <label className={LABEL}>Turno</label>
+              <label className={LABEL_CLASS}>Turno</label>
               <select
                 name="turno"
-                value={formData.turno} onChange={handleChange}
+                value={formData.turno}
+                onChange={handleChange}
                 required
-                className={`${INPUT} cursor-pointer appearance-none`}
+                className={`${INPUT_CLASS} cursor-pointer appearance-none`}
               >
-                <option value="" className="bg-[#0d2f7a] text-white">Selecciona un turno</option>
-                <option value="matutino"   className="bg-[#0d2f7a] text-white">Matutino</option>
-                <option value="vespertino" className="bg-[#0d2f7a] text-white">Vespertino</option>
-                <option value="nocturno"   className="bg-[#0d2f7a] text-white">Nocturno</option>
+                <option value="" className="bg-[#0d2f7a] text-white">
+                  Selecciona un turno
+                </option>
+                {TURNOS.map((turno) => (
+                  <option key={turno} value={turno} className="bg-[#0d2f7a] text-white">
+                    {turno.charAt(0).toUpperCase() + turno.slice(1)}
+                  </option>
+                ))}
               </select>
             </div>
 
             {/* Ciclo escolar */}
             <div>
-              <label className={LABEL}>Ciclo escolar</label>
+              <label className={LABEL_CLASS}>Ciclo escolar</label>
               <input
-                type="text" name="cicloEscolar"
-                value={formData.cicloEscolar} onChange={handleChange}
-                placeholder="ej. 2026-1" required
-                className={INPUT}
+                type="text"
+                name="cicloEscolar"
+                value={formData.cicloEscolar}
+                onChange={handleChange}
+                placeholder="ej. 2026-1"
+                required
+                className={INPUT_CLASS}
               />
             </div>
 
