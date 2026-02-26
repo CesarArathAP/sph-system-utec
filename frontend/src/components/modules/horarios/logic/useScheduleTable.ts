@@ -27,7 +27,14 @@ export function useScheduleTable(filterDia: string, refreshKey: number) {
       const res = await fetch(`${BASE}/horarios?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!res.ok) throw new Error(`Error de Conexión: ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error('No tienes permisos para consultar los horarios.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un problema al obtener los horarios. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudieron cargar los horarios (código ${res.status}).`);
+      }
       const data = await res.json();
       const rawHorarios = data.horarios ?? [];
       setHorarios(rawHorarios);
@@ -76,7 +83,11 @@ export function useScheduleTable(filterDia: string, refreshKey: number) {
         setHorarioVersiones(versionesMap);
       }
     } catch (e: any) {
-      setError(e.message);
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al cargar los horarios.')
+      );
     } finally {
       setLoading(false);
     }
