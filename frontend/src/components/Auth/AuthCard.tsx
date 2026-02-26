@@ -103,10 +103,14 @@ function LoginFace({ onFlip }: { onFlip: () => void }) {
       if (res.access_token) {
         window.location.href = '/auth/dashboard';
       } else {
-        setError(res.message || 'Credenciales incorrectas');
+        setError(res.message || 'Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.');
       }
-    } catch {
-      setError('Error de conexión con el servidor');
+    } catch (e) {
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : 'Ocurrió un error inesperado. Intenta de nuevo.'
+      );
     } finally {
       setLoading(false);
     }
@@ -202,13 +206,17 @@ function RegisterFace({ onFlip }: { onFlip: () => void }) {
     try {
       const res = await authService.register(formData);
       if (res.id) {
-        setSuccess('¡Cuenta creada! Redirigiendo...');
+        setSuccess('¡Cuenta creada! Redirigiendo al inicio de sesión...');
         setTimeout(() => onFlip(), 1500);
       } else {
-        setError(res.message || 'Error al crear la cuenta');
+        setError(res.message || 'No se pudo crear la cuenta. Intenta de nuevo.');
       }
-    } catch {
-      setError('Error de conexión con el servidor');
+    } catch (e) {
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : 'Ocurrió un error inesperado. Intenta de nuevo.'
+      );
     } finally {
       setLoading(false);
     }
