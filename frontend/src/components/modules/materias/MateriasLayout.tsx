@@ -213,10 +213,13 @@ export default function MateriasLayout() {
 
       {/* Error */}
       {error && !loading && (
-        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20
                         text-red-400 rounded-xl px-4 py-3 text-sm mb-5">
-          <XCircle size={18} className="shrink-0 text-red-400" />
-          {error}
+          <XCircle size={18} className="shrink-0 text-red-400 mt-0.5" />
+          <div>
+            <p className="font-semibold">No se pudieron cargar las materias</p>
+            <p className="text-red-400/80 text-xs mt-0.5">{error}</p>
+          </div>
         </div>
       )}
 
