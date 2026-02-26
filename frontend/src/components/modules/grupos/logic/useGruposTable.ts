@@ -51,12 +51,23 @@ export function useGruposTable() {
       const res = await fetch(`${BASE}?page=1&page_size=100`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        if (res.status === 403) throw new Error('No tienes permisos para ver los grupos.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un problema al obtener los grupos. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudieron cargar los grupos (código ${res.status}).`);
+      }
       const data = await res.json();
       setGrupos((data.grupos ?? []).map(fromBackend));
       setTotal(data.total ?? 0);
     } catch (e: any) {
-      setError(e.message ?? 'Error al cargar grupos');
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al cargar los grupos.')
+      );
     } finally {
       setLoading(false);
     }
