@@ -34,13 +34,17 @@ export default function RegisterForm() {
       });
 
       if (response.id) {
-        setSuccess('¡Cuenta creada exitosamente! Redirigiendo al login...');
+        setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...');
         setTimeout(() => { window.location.href = '/'; }, 1500);
       } else {
-        setError(response.message || 'Error al crear la cuenta');
+        setError(response.message || 'No se pudo crear la cuenta. Intenta de nuevo.');
       }
     } catch (err) {
-      setError('Error de conexión con el servidor');
+      setError(
+        err instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : 'Ocurrió un error inesperado. Intenta de nuevo.'
+      );
     } finally {
       setLoading(false);
     }
