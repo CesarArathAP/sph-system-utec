@@ -1,204 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   RefreshCw, ClipboardList, Wand2, AlertTriangle, CheckCircle2,
   Clock, BarChart2, CalendarDays, X,
 } from 'lucide-react';
-import { API_CONFIG } from '../../../services/config';
-import { useToast } from '../../common/Toast';
 import DisponibilidadViewModal from '../profesores/DisponibilidadViewModal';
 import type { Docente } from '../profesores/ProfesoresLayout';
+import type { AssignmentModalProps, AsignacionOption } from './logic/types';
+import { useAssignmentModal } from './logic/useAssignmentModal';
+import { useManualSchedule } from './logic/useManualSchedule';
+import { useAutoGeneration } from './logic/useAutoGeneration';
+import { DIAS, TIPOS, HOUR_OPTIONS, STYLES } from './logic/constants';
 
-interface AssignmentModalProps { isOpen: boolean; onClose: () => void; onSaved?: () => void; }
-
-interface AsignacionOption {
-  id: number; ciclo_escolar: string;
-  grupo?:   { nombre: string; codigo_grupo: string };
-  materia?: { nombre: string };
-  docente?: Docente;
-}
-interface AulaOption { id: number; nombre: string; codigo_aula: string; capacidad: number; }
-interface Diagnostico {
-  tipo: 'warning' | 'critica'; titulo: string; mensaje: string;
-  detalles?: string | string[] | Record<string, any>; sugerencia?: string; [key: string]: unknown;
-}
-interface GenerateResult {
-  horarios_creados?: number; conflictos_detectados?: number;
-  asignaciones_fallidas?: any[]; asignaciones_parciales?: number;
-  asignaciones_completadas?: number; diagnosticos?: Diagnostico[];
-  alertas?: Diagnostico[]; mensaje?: string; [key: string]: unknown;
-}
-
-const DIAS  = [{ value:'lunes',label:'Lunes' },{ value:'martes',label:'Martes' },{ value:'miercoles',label:'Miércoles' },{ value:'jueves',label:'Jueves' },{ value:'viernes',label:'Viernes' },{ value:'sabado',label:'Sábado' }];
-const TIPOS = [{ value:'teorica',label:'Teórica' },{ value:'practica',label:'Práctica' },{ value:'laboratorio',label:'Laboratorio' }];
-const HOUR_OPTIONS: string[] = [];
-for (let h = 7; h <= 22; h++) HOUR_OPTIONS.push(`${String(h).padStart(2,'0')}:00`);
-
-function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = API_CONFIG.BASE_URL;
-const EMPTY_FORM = { asignacion_id: 0, aula_id: 0, dia_semana: 'lunes', hora_inicio: '07:00', hora_fin: '08:00', tipo_sesion: 'teorica' };
-
-/* ── Estilos compartidos */
-const SELECT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-[#0d2a6e] text-white text-sm outline-none transition focus:border-white/60 cursor-pointer';
-const LABEL  = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
-const INPUT  = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm placeholder:text-white/40 outline-none transition focus:border-white/60 focus:bg-white/20';
+const { SELECT, LABEL, INPUT } = STYLES;
 
 export default function AssignmentModal({ isOpen, onClose, onSaved }: AssignmentModalProps) {
-  const { addToast } = useToast();
-  const [tab, setTab] = useState<'manual' | 'auto'>('auto');
+  // Modal state
+  const { tab, setTab, asignaciones, aulas, loadingData, showDisponibilidad, setShowDisponibilidad } = 
+    useAssignmentModal(isOpen);
 
-  /* Manual */
-  const [form, setForm]                         = useState(EMPTY_FORM);
-  const [asignaciones, setAsignaciones]         = useState<AsignacionOption[]>([]);
-  const [aulas, setAulas]                       = useState<AulaOption[]>([]);
-  const [loadingData, setLoadingData]           = useState(false);
-  const [saving, setSaving]                     = useState(false);
-  const [errorManual, setErrorManual]           = useState<string | null>(null);
-  const [disponibilidadError, setDisponibilidadError] = useState<{ dia:string; franjas_disponibles:string; sugerencia:string }|null>(null);
-  const [horasMaxError, setHorasMaxError]       = useState<{ limite:number; horas_actuales:number; horas_nuevas:number; horas_totales:number; sugerencia:string }|null>(null);
-  const [showDisponibilidad, setShowDisponibilidad] = useState(false);
+  // Manual schedule logic
+  const { form, setForm, saving, errorManual, disponibilidadError, horasMaxError, handleManualSubmit, resetForm } = 
+    useManualSchedule(onSaved, onClose);
+
+  // Auto generation logic
+  const { ciclo, setCiclo, clearExisting, setClearExisting, generating, genResult, errorAuto, handleGenerate } = 
+    useAutoGeneration(onSaved);
 
   const docenteSeleccionado: Docente | null =
     (asignaciones.find(a => a.id === form.asignacion_id)?.docente ?? null) as Docente | null;
-
-  /* Automático */
-  const [ciclo, setCiclo]           = useState('');
-  const [clearExisting, setClearExisting] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [genResult, setGenResult]   = useState<GenerateResult | null>(null);
-  const [errorAuto, setErrorAuto]   = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setForm(EMPTY_FORM); setErrorManual(null); setGenResult(null); setErrorAuto(null);
-    const fetchData = async () => {
-      setLoadingData(true);
-      try {
-        const [resAsig, resAulas] = await Promise.all([
-          fetch(`${BASE}/asignaciones?page=1&page_size=100`, { headers: { Authorization: `Bearer ${getToken()}` } }),
-          fetch(`${BASE}/aulas?page=1&page_size=100&activo=true`,  { headers: { Authorization: `Bearer ${getToken()}` } }),
-        ]);
-        const da = resAsig.ok  ? await resAsig.json()  : { asignaciones:[] };
-        const dau = resAulas.ok ? await resAulas.json() : { aulas:[] };
-        setAsignaciones(da.asignaciones ?? []);
-        setAulas(dau.aulas ?? []);
-      } finally { setLoadingData(false); }
-    };
-    fetchData();
-  }, [isOpen]);
-
-  /* Crear horario manual */
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.hora_fin <= form.hora_inicio) { 
-      setErrorManual('La hora de fin debe ser mayor que la de inicio');
-      addToast({
-        type: 'error',
-        title: '✗ Error en horario',
-        message: 'La hora de fin debe ser mayor que la de inicio',
-        duration: 3000
-      });
-      return; 
-    }
-    if (!form.asignacion_id || !form.aula_id) { 
-      setErrorManual('Debes seleccionar una asignación y un aula');
-      addToast({
-        type: 'error',
-        title: '✗ Campos incompletos',
-        message: 'Debes seleccionar una asignación y un aula',
-        duration: 3000
-      });
-      return; 
-    }
-    setSaving(true); setErrorManual(null); setDisponibilidadError(null); setHorasMaxError(null);
-    try {
-      const res = await fetch(`${BASE}/horarios`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ ...form, hora_inicio: `${form.hora_inicio}:00`, hora_fin: `${form.hora_fin}:00` }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        const detail = err?.detail;
-        if (detail && typeof detail === 'object' && detail.mensaje) {
-          setErrorManual(detail.mensaje);
-          addToast({
-            type: 'error',
-            title: '✗ No se pudo crear',
-            message: detail.mensaje,
-            duration: 4000
-          });
-          if (detail.disponibilidad_docente) setDisponibilidadError(detail.disponibilidad_docente);
-          if (detail.horas_maximas) setHorasMaxError(detail.horas_maximas);
-          return;
-        }
-        throw new Error(typeof detail === 'string' ? detail : `Error ${res.status}`);
-      }
-      addToast({
-        type: 'success',
-        title: '✓ Horario creado',
-        message: 'El horario se creó correctamente',
-        duration: 3000
-      });
-      onSaved?.(); onClose();
-    } catch (e: any) { 
-      const errorMsg = e.message ?? 'Error al crear el horario';
-      setErrorManual(errorMsg);
-      addToast({
-        type: 'error',
-        title: '✗ Error',
-        message: errorMsg,
-        duration: 4000
-      });
-    }
-    finally { setSaving(false); }
-  };
-
-  /* Generación automática */
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ciclo.trim()) { setErrorAuto('Ingresa el ciclo escolar'); return; }
-    setGenerating(true); setErrorAuto(null); setGenResult(null);
-    try {
-      const params = new URLSearchParams({ ciclo_escolar: ciclo.trim() });
-      if (clearExisting) params.set('clear_existing', 'true');
-      const res = await fetch(`${BASE}/schedule/generate?${params}`, {
-        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.detail ?? `Error ${res.status}`); }
-      const result = await res.json();
-      setGenResult(result);
-      
-      // Mostrar Toast de éxito
-      if (!result.alertas || result.alertas.length === 0) {
-        addToast({
-          type: 'success',
-          title: '✓ Horarios generados',
-          message: `Se crearon ${result.horarios_creados ?? 0} horarios exitosamente para el ciclo ${ciclo}`,
-          duration: 4000
-        });
-      } else {
-        // Mostrar Toast de error si hay alertas críticas
-        addToast({
-          type: 'error',
-          title: '✗ Error en la generación',
-          message: `No se pudieron generar los horarios. ${result.alertas[0]?.titulo ?? 'Verifique los datos'}`,
-          duration: 5000
-        });
-      }
-      onSaved?.();
-    } catch (e: any) { 
-      const errorMsg = e.message ?? 'Error al generar horarios';
-      setErrorAuto(errorMsg);
-      addToast({
-        type: 'error',
-        title: '✗ Error',
-        message: errorMsg,
-        duration: 4000
-      });
-    }
-    finally { setGenerating(false); }
-  };
 
   const asigLabel = (a: AsignacionOption) => {
     const grupo   = a.grupo?.nombre   ?? '—';
