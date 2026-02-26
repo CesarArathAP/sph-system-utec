@@ -1,48 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, BookOpen } from 'lucide-react';
-import type { Materia } from './MateriasLayout';
-
-interface MateriasModalProps {
-  isOpen: boolean;
-  materia: Materia | null;
-  onClose: () => void;
-  onSave: (materia: Materia) => void;
-}
-
-const emptyForm: Materia = {
-  codigo_materia: '', nombre: '', creditos: 1, horas_semana: 1,
-  requiere_laboratorio: false, tipo_aula_requerida: null, descripcion: null, activo: true,
-};
-
-const INPUT = 'w-full px-4 py-2.5 rounded-xl border border-white/25 bg-white/10 text-white text-sm ' +
-              'placeholder:text-white/40 outline-none transition focus:border-white/60 focus:bg-white/20';
-const LABEL = 'block text-xs font-semibold text-white/70 mb-1.5 tracking-wide uppercase';
+import { useMateriasForm } from './logic/useMateriasForm';
+import { INPUT_CLASS, LABEL_CLASS, TIPOS_AULA } from './logic/constants';
+import type { MateriasModalProps } from './logic/types';
 
 export default function MateriasModal({ isOpen, materia, onClose, onSave }: MateriasModalProps) {
-  const [formData, setFormData] = useState<Materia>(emptyForm);
+  const { formData, handleChange, isEditing } = useMateriasForm(materia, isOpen);
 
-  useEffect(() => {
-    setFormData(materia ? { ...materia } : { ...emptyForm });
-  }, [materia, isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, type, value } = e.target;
-    if (type === 'checkbox') {
-      setFormData(prev => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
-    } else if (name === 'creditos' || name === 'horas_semana') {
-      setFormData(prev => ({ ...prev, [name]: parseInt(value) || 1 }));
-    } else if (name === 'tipo_aula_requerida') {
-      setFormData(prev => ({ ...prev, tipo_aula_requerida: value || null }));
-    } else if (name === 'descripcion') {
-      setFormData(prev => ({ ...prev, descripcion: value || null }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
   };
-
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(formData); };
-  const isEditing = !!materia?.id;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -77,81 +46,140 @@ export default function MateriasModal({ isOpen, materia, onClose, onSave }: Mate
           {/* Formulario */}
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
 
-            {/* Código */}
+          {/* Código */}
+          <div>
+            <label className={LABEL_CLASS}>
+              Código <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              name="codigo_materia"
+              value={formData.codigo_materia}
+              onChange={handleChange}
+              placeholder="ej. MAT101"
+              required
+              maxLength={20}
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {/* Nombre */}
+          <div>
+            <label className={LABEL_CLASS}>
+              Nombre <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              name="nombre"
+              value={formData.nombre}
+              onChange={handleChange}
+              placeholder="ej. Cálculo Diferencial"
+              required
+              maxLength={200}
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {/* Créditos + Horas */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={LABEL}>Código <span className="text-red-400">*</span></label>
-              <input type="text" name="codigo_materia"
-                value={formData.codigo_materia} onChange={handleChange}
-                placeholder="ej. MAT101" required maxLength={20} className={INPUT} />
+              <label className={LABEL_CLASS}>
+                Créditos <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                name="creditos"
+                value={formData.creditos}
+                onChange={handleChange}
+                min={1}
+                max={10}
+                required
+                className={INPUT_CLASS}
+              />
             </div>
-
-            {/* Nombre */}
             <div>
-              <label className={LABEL}>Nombre <span className="text-red-400">*</span></label>
-              <input type="text" name="nombre"
-                value={formData.nombre} onChange={handleChange}
-                placeholder="ej. Cálculo Diferencial" required maxLength={200} className={INPUT} />
+              <label className={LABEL_CLASS}>
+                Horas / semana <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                name="horas_semana"
+                value={formData.horas_semana}
+                onChange={handleChange}
+                min={1}
+                max={20}
+                required
+                className={INPUT_CLASS}
+              />
             </div>
+          </div>
 
-            {/* Créditos + Horas */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={LABEL}>Créditos <span className="text-red-400">*</span></label>
-                <input type="number" name="creditos"
-                  value={formData.creditos} onChange={handleChange}
-                  min={1} max={10} required className={INPUT} />
-              </div>
-              <div>
-                <label className={LABEL}>Horas / semana <span className="text-red-400">*</span></label>
-                <input type="number" name="horas_semana"
-                  value={formData.horas_semana} onChange={handleChange}
-                  min={1} max={20} required className={INPUT} />
-              </div>
-            </div>
+          {/* Tipo aula */}
+          <div>
+            <label className={LABEL_CLASS}>Tipo de aula requerida</label>
+            <select
+              name="tipo_aula_requerida"
+              value={formData.tipo_aula_requerida ?? ''}
+              onChange={handleChange}
+              className={`${INPUT_CLASS} cursor-pointer appearance-none`}
+            >
+              <option value="" className="bg-[#0d2f7a] text-white">
+                Sin especificar
+              </option>
+              {TIPOS_AULA.map((tipo) => (
+                <option key={tipo} value={tipo} className="bg-[#0d2f7a] text-white">
+                  {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* Tipo aula */}
-            <div>
-              <label className={LABEL}>Tipo de aula requerida</label>
-              <select name="tipo_aula_requerida"
-                value={formData.tipo_aula_requerida ?? ''} onChange={handleChange}
-                className={`${INPUT} cursor-pointer appearance-none`}>
-                <option value="" className="bg-[#0d2f7a] text-white">Sin especificar</option>
-                <option value="normal"      className="bg-[#0d2f7a] text-white">Normal</option>
-                <option value="computo"     className="bg-[#0d2f7a] text-white">Cómputo</option>
-                <option value="laboratorio" className="bg-[#0d2f7a] text-white">Laboratorio</option>
-                <option value="auditorio"   className="bg-[#0d2f7a] text-white">Auditorio</option>
-              </select>
-            </div>
+          {/* Checkboxes */}
+          <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3">
+            <input
+              type="checkbox"
+              name="requiere_laboratorio"
+              id="requiere_laboratorio"
+              checked={formData.requiere_laboratorio}
+              onChange={handleChange}
+              className="w-4 h-4 accent-blue-400 cursor-pointer"
+            />
+            <label
+              htmlFor="requiere_laboratorio"
+              className="text-sm font-medium text-white/80 cursor-pointer select-none"
+            >
+              Requiere laboratorio
+            </label>
+          </div>
 
-            {/* Checkboxes */}
+          {isEditing && (
             <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3">
-              <input type="checkbox" name="requiere_laboratorio" id="requiere_laboratorio"
-                checked={formData.requiere_laboratorio} onChange={handleChange}
-                className="w-4 h-4 accent-blue-400 cursor-pointer" />
-              <label htmlFor="requiere_laboratorio" className="text-sm font-medium text-white/80 cursor-pointer select-none">
-                Requiere laboratorio
+              <input
+                type="checkbox"
+                name="activo"
+                id="activo"
+                checked={formData.activo}
+                onChange={handleChange}
+                className="w-4 h-4 accent-green-400 cursor-pointer"
+              />
+              <label htmlFor="activo" className="text-sm font-medium text-white/80 cursor-pointer select-none">
+                Materia activa
               </label>
             </div>
+          )}
 
-            {isEditing && (
-              <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-xl px-4 py-3">
-                <input type="checkbox" name="activo" id="activo"
-                  checked={formData.activo} onChange={handleChange}
-                  className="w-4 h-4 accent-green-400 cursor-pointer" />
-                <label htmlFor="activo" className="text-sm font-medium text-white/80 cursor-pointer select-none">
-                  Materia activa
-                </label>
-              </div>
-            )}
-
-            {/* Descripción */}
-            <div>
-              <label className={LABEL}>Descripción</label>
-              <textarea name="descripcion"
-                value={formData.descripcion ?? ''} onChange={handleChange}
-                placeholder="ej. Introducción al cálculo diferencial e integral..."
-                rows={3} className={`${INPUT} resize-none`} />
-            </div>
+          {/* Descripción */}
+          <div>
+            <label className={LABEL_CLASS}>Descripción</label>
+            <textarea
+              name="descripcion"
+              value={formData.descripcion ?? ''}
+              onChange={handleChange}
+              placeholder="ej. Introducción al cálculo diferencial e integral..."
+              rows={3}
+              className={`${INPUT_CLASS} resize-none`}
+            />
+          </div>
 
             {/* Botones */}
             <div className="flex gap-3 justify-end pt-2 border-t border-white/15">
