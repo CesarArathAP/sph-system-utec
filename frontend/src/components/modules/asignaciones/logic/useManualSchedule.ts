@@ -29,26 +29,26 @@ export function useManualSchedule(onSaved?: () => void, onClose?: () => void) {
 
     // Validación: hora de fin mayor que hora de inicio
     if (form.hora_fin <= form.hora_inicio) {
-      const errorMsg = 'La hora de fin debe ser mayor que la de inicio';
+      const errorMsg = 'La hora de fin debe ser posterior a la hora de inicio. Revisa los campos de horario.';
       setErrorManual(errorMsg);
       addToast({
         type: 'error',
-        title: '✗ Error en horario',
+        title: '✗ Horario inválido',
         message: errorMsg,
-        duration: 3000,
+        duration: 3500,
       });
       return;
     }
 
     // Validación: campos requeridos
     if (!form.asignacion_id || !form.aula_id) {
-      const errorMsg = 'Debes seleccionar una asignación y un aula';
+      const errorMsg = 'Debes seleccionar una asignación y un aula antes de guardar el horario.';
       setErrorManual(errorMsg);
       addToast({
         type: 'error',
         title: '✗ Campos incompletos',
         message: errorMsg,
-        duration: 3000,
+        duration: 3500,
       });
       return;
     }
@@ -80,9 +80,9 @@ export function useManualSchedule(onSaved?: () => void, onClose?: () => void) {
           setErrorManual(detail.mensaje);
           addToast({
             type: 'error',
-            title: '✗ No se pudo crear',
+            title: '✗ No se pudo crear el horario',
             message: detail.mensaje,
-            duration: 4000,
+            duration: 5000,
           });
 
           if (detail.disponibilidad_docente) {
@@ -94,13 +94,20 @@ export function useManualSchedule(onSaved?: () => void, onClose?: () => void) {
           return;
         }
 
-        throw new Error(typeof detail === 'string' ? detail : `Error ${res.status}`);
+        // Mensajes según código HTTP
+        const serverMsg = typeof detail === 'string' ? detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error('No tienes permisos para crear horarios.');
+        if (res.status === 409) throw new Error(serverMsg ?? 'El aula o el docente ya tiene un horario en ese intervalo. Elige otro horario o aula.');
+        if (res.status === 422) throw new Error(serverMsg ?? 'Los datos del horario son inválidos. Revisa los campos e intenta de nuevo.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un error al crear el horario. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudo crear el horario (código ${res.status}).`);
       }
 
       addToast({
         type: 'success',
         title: '✓ Horario creado',
-        message: 'El horario se creó correctamente',
+        message: 'El horario se creó y quedó registrado correctamente.',
         duration: 3000,
       });
 
@@ -108,13 +115,16 @@ export function useManualSchedule(onSaved?: () => void, onClose?: () => void) {
       onClose?.();
       setForm(EMPTY_FORM);
     } catch (e: any) {
-      const errorMsg = e.message ?? 'Error al crear el horario';
+      const errorMsg =
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al crear el horario.');
       setErrorManual(errorMsg);
       addToast({
         type: 'error',
-        title: '✗ Error',
+        title: '✗ Error al crear el horario',
         message: errorMsg,
-        duration: 4000,
+        duration: 5000,
       });
     } finally {
       setSaving(false);

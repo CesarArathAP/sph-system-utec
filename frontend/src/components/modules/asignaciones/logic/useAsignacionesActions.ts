@@ -46,13 +46,25 @@ export function useAsignacionesActions(onRefresh: () => Promise<void>) {
       });
 
       if (!res.ok) {
-        throw new Error(`Error ${res.status}`);
+        const err = await res.json().catch(() => null);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error('No tienes permisos para eliminar esta asignación.');
+        if (res.status === 409) throw new Error(serverMsg ?? `La asignación "${label}" no se puede eliminar porque tiene horarios activos asociados. Elimina primero los horarios correspondientes.`);
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un error al eliminar la asignación. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudo eliminar la asignación (código ${res.status}).`);
       }
 
       await onRefresh();
       addToast('info', 'Asignación eliminada', `"${label}" fue eliminada junto con sus horarios`);
     } catch (e: any) {
-      addToast('error', 'No se pudo eliminar', e.message);
+      addToast(
+        'error',
+        'No se pudo eliminar la asignación',
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : e.message
+      );
     }
   }, [confirm, onRefresh, addToast]);
 

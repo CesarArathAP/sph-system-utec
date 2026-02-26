@@ -26,7 +26,7 @@ export function useAutoGeneration(onSaved?: () => void) {
     e.preventDefault();
 
     if (!ciclo.trim()) {
-      setErrorAuto('Ingresa el ciclo escolar');
+      setErrorAuto('El ciclo escolar es obligatorio. Ingresa un valor como "2026-1" para continuar.');
       return;
     }
 
@@ -49,7 +49,13 @@ export function useAutoGeneration(onSaved?: () => void) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.detail ?? `Error ${res.status}`);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error('No tienes permisos para generar horarios.');
+        if (res.status === 404) throw new Error(`No se encontraron asignaciones para el ciclo "${ciclo}". Verifica que el ciclo exista y tenga asignaciones registradas.`);
+        if (res.status === 422) throw new Error(serverMsg ?? 'No fue posible generar los horarios. Verifica que haya grupos, docentes y aulas activos con disponibilidad definida.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un error al generar los horarios. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? err?.detail ?? `No se pudo generar (código ${res.status}).`);
       }
 
       const result = await res.json();
@@ -60,27 +66,30 @@ export function useAutoGeneration(onSaved?: () => void) {
         addToast({
           type: 'success',
           title: '✓ Horarios generados',
-          message: `Se crearon ${result.horarios_creados ?? 0} horarios exitosamente para el ciclo ${ciclo}`,
-          duration: 4000,
+          message: `Se crearon ${result.horarios_creados ?? 0} horarios exitosamente para el ciclo "${ciclo}".`,
+          duration: 5000,
         });
       } else {
         addToast({
           type: 'error',
-          title: '✗ Error en la generación',
-          message: `No se pudieron generar los horarios. ${result.alertas[0]?.titulo ?? 'Verifique los datos'}`,
-          duration: 5000,
+          title: '✗ Generación con alertas',
+          message: `No se pudieron generar todos los horarios. ${result.alertas[0]?.titulo ?? 'Revisa las alertas para más detalles.'}`,
+          duration: 6000,
         });
       }
 
       onSaved?.();
     } catch (e: any) {
-      const errorMsg = e.message ?? 'Error al generar horarios';
+      const errorMsg =
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al generar los horarios.');
       setErrorAuto(errorMsg);
       addToast({
         type: 'error',
-        title: '✗ Error',
+        title: '✗ Error al generar horarios',
         message: errorMsg,
-        duration: 4000,
+        duration: 5000,
       });
     } finally {
       setGenerating(false);

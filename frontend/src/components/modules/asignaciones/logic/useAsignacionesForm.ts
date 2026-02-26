@@ -55,13 +55,24 @@ export function useAsignacionesForm(isOpen: boolean, editing: Asignacion | null,
           }),
         ]);
 
+        if (rG.status === 401 || rM.status === 401 || rD.status === 401) {
+          setError('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+          return;
+        }
+
         const dg = rG.ok ? await rG.json() : {};
         const dm = rM.ok ? await rM.json() : {};
         const dd = rD.ok ? await rD.json() : {};
 
+        if (!rG.ok) setError('No se pudieron cargar los grupos activos. Intenta refrescar la página.');
+        else if (!rM.ok) setError('No se pudieron cargar las materias activas. Intenta refrescar la página.');
+        else if (!rD.ok) setError('No se pudieron cargar los docentes activos. Intenta refrescar la página.');
+
         setGrupos(dg.grupos ?? []);
         setMaterias(dm.materias ?? []);
         setDocentes(dd.docentes ?? []);
+      } catch {
+        setError('No se pudo conectar con el servidor al cargar los datos. Verifica tu conexión a internet.');
       } finally {
         setLoadingData(false);
       }
@@ -83,12 +94,12 @@ export function useAsignacionesForm(isOpen: boolean, editing: Asignacion | null,
 
     // Validation
     if (!form.grupo_id || !form.materia_id || !form.docente_id) {
-      setError('Selecciona grupo, materia y docente');
+      setError('Debes seleccionar un grupo, una materia y un docente para continuar.');
       return;
     }
 
     if (!form.ciclo_escolar.trim()) {
-      setError('El ciclo escolar es requerido');
+      setError('El ciclo escolar es obligatorio. Ingresa un valor como "2026-1".');
       return;
     }
 
@@ -108,12 +119,22 @@ export function useAsignacionesForm(isOpen: boolean, editing: Asignacion | null,
 
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.detail ?? `Error ${res.status}`);
+        const serverMsg = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error('No tienes permisos para realizar esta acción.');
+        if (res.status === 409) throw new Error(serverMsg ?? 'Ya existe una asignación con la misma combinación de grupo, materia y ciclo escolar.');
+        if (res.status === 422) throw new Error(serverMsg ?? 'Algunos datos son inválidos. Revisa el formulario e intenta de nuevo.');
+        if (res.status >= 500) throw new Error(serverMsg ?? 'El servidor tuvo un error al guardar. Intenta de nuevo más tarde.');
+        throw new Error(serverMsg ?? `No se pudo guardar la asignación (código ${res.status}).`);
       }
 
       onSaved();
     } catch (e: any) {
-      setError(e.message ?? 'Error al guardar');
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Verifica tu conexión a internet.'
+          : (e.message ?? 'Ocurrió un error inesperado al guardar.')
+      );
     } finally {
       setSaving(false);
     }
