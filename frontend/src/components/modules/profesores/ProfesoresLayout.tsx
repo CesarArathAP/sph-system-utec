@@ -106,7 +106,7 @@ function ConfirmDialog({
 export default function ProfesoresLayout() {
   const { docentes, total, loading, error, searchTerm, setSearchTerm, filtered, fetchDocentes } =
     useProfesoresTable();
-  const { toasts, removeToast, handleSave, handleToggleActivo, handleDelete } =
+  const { toasts, removeToast, addToast, handleSave, handleToggleActivo, handleDelete } =
     useProfesoresActions(fetchDocentes);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -291,7 +291,7 @@ export default function ProfesoresLayout() {
                           {docente.activo ? <PowerOff size={14} /> : <Power size={14} />}
                         </button>
                         <button
-                          onClick={() => handleDelete(docente.id)}
+                          onClick={() => openConfirm(docente.id)}
                           className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition cursor-pointer"
                           title="Eliminar docente">
                           <Trash2 size={14} />
@@ -312,7 +312,17 @@ export default function ProfesoresLayout() {
         docente={selectedDocente}
         onClose={() => setIsModalOpen(false)}
         onSave={(docente) => {
-          handleSave(docente, selectedDocente);
+          if (selectedDocente?.id) {
+            // Modo edición: handleSave hace el PUT y muestra el toast
+            handleSave(docente, selectedDocente);
+          } else {
+            // Modo creación: el wizard ya hizo el POST, solo refrescamos y notificamos
+            fetchDocentes();
+            const nombre = docente.user
+              ? `${docente.user.nombre} ${docente.user.apellido}`
+              : docente.codigo_docente;
+            addToast('success', 'Docente registrado', `"${nombre}" fue registrado exitosamente`);
+          }
           setIsModalOpen(false);
         }}
       />
