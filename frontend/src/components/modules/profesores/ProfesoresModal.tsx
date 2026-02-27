@@ -12,9 +12,16 @@ interface UserResult {
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem('auth_token') ?? ''; }
-const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
+
+// URL base para docentes: /api/v1/docentes
+const BASE_DOCENTES = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
+// URL base para usuarios: /api/v1/users
+const BASE_USERS = `${API_CONFIG.BASE_URL}/users`;
+// URL para registro: /api/v1/auth/register
+const AUTH_REGISTER = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.REGISTER}`;
 
 const emptyUser    = { nombre: '', apellido: '', email: '', password: '' };
+const emptyDocente = { codigo_docente: '', departamento: '', horas_maximas_semana: 20 };
 
 
 /* ════════════════════════════════════════════════════════════════
@@ -24,11 +31,21 @@ function EditDocenteForm({ docente, onSave, onClose }:
   { docente: Docente; onSave: (d: Docente) => void; onClose: () => void }) {
 
   const [form, setForm] = useState({
-    codigo_docente:      docente.codigo_docente,
-    departamento:        docente.departamento ?? '',
+    codigo_docente:       docente.codigo_docente,
+    departamento:         docente.departamento ?? '',
     horas_maximas_semana: docente.horas_maximas_semana,
-    activo:              docente.activo,
+    activo:               docente.activo,
   });
+
+  // Actualizar el form cuando cambia el docente seleccionado
+  useEffect(() => {
+    setForm({
+      codigo_docente:       docente.codigo_docente,
+      departamento:         docente.departamento ?? '',
+      horas_maximas_semana: docente.horas_maximas_semana,
+      activo:               docente.activo,
+    });
+  }, [docente.id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, type, value, checked } = e.target;
@@ -106,8 +123,8 @@ function EditDocenteForm({ docente, onSave, onClose }:
 /* ════════════════════════════════════════════════════════════════
    WIZARD CREAR (2 pasos)
    ══════════════════════════════════════════════════════════════ */
-function CreateDocenteWizard({ onSave, onClose }:
-  { onSave: (d: Docente) => void; onClose: () => void }) {
+function CreateDocenteWizard({ isOpen, onSave, onClose }:
+  { isOpen: boolean; onSave: (d: Docente) => void; onClose: () => void }) {
 
   const [step, setStep]                     = useState<1 | 2>(1);
   const [mode, setMode]                     = useState<'search' | 'create'>('search');
@@ -123,6 +140,25 @@ function CreateDocenteWizard({ onSave, onClose }:
   const [saveError, setSaveError]           = useState<string | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Resetear todo el wizard cuando el modal se cierra
+  useEffect(() => {
+    if (!isOpen) {
+      setStep(1);
+      setMode('search');
+      setSearchQ('');
+      setSearchResults([]);
+      setSearching(false);
+      setSelectedUser(null);
+      setNewUser(emptyUser);
+      setCreating(false);
+      setCreateError(null);
+      setDocenteForm(emptyDocente);
+      setSaving(false);
+      setSaveError(null);
+    }
+  }, [isOpen]);
+
+  // Búsqueda de usuarios con debounce
   useEffect(() => {
     if (mode !== 'search') return;
     if (searchQ.length < 2) { setSearchResults([]); return; }
@@ -131,50 +167,98 @@ function CreateDocenteWizard({ onSave, onClose }:
       setSearching(true);
       try {
         const res = await fetch(
-          `${BASE}/users?q=${encodeURIComponent(searchQ)}&rol=docente&sin_docente=true&limit=10`,
+          `${BASE_USERS}?q=${encodeURIComponent(searchQ)}&rol=docente&sin_docente=true&limit=10`,
           { headers: { Authorization: `Bearer ${getToken()}` } }
         );
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error(`Error ${res.status}`);
         setSearchResults(await res.json());
-      } catch { setSearchResults([]); }
-      finally { setSearching(false); }
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
     }, 350);
   }, [searchQ, mode]);
 
+  /* Paso 1 — Crear nuevo usuario con rol docente */
   const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault(); setCreating(true); setCreateError(null);
+    e.preventDefault();
+    setCreating(true);
+    setCreateError(null);
     try {
-      const res = await fetch(`${BASE}/auth/register`, {
+      const res = await fetch(AUTH_REGISTER, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
         body: JSON.stringify({ ...newUser, rol: 'docente' }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.detail ?? `Error ${res.status}`);
+        const detail = err?.detail;
+        if (res.status === 409) throw new Error('Ya existe un usuario con ese email.');
+        if (res.status === 422) throw new Error(typeof detail === 'string' ? detail : 'Datos inválidos. Revisa el formulario.');
+        throw new Error(typeof detail === 'string' ? detail : `Error ${res.status} al crear el usuario.`);
       }
       const created: UserResult = await res.json();
-      setSelectedUser(created); setStep(2);
-    } catch (e: any) { setCreateError(e.message ?? 'Error al crear el usuario'); }
-    finally { setCreating(false); }
+      setSelectedUser(created);
+      setStep(2);
+    } catch (e: any) {
+      setCreateError(e.message ?? 'Error al crear el usuario.');
+    } finally {
+      setCreating(false);
+    }
   };
 
+  /* Paso 2 — Guardar perfil docente */
   const handleSaveDocente = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-    setSaving(true); setSaveError(null);
+    if (!docenteForm.codigo_docente.trim()) {
+      setSaveError('El código docente es obligatorio.');
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
     try {
-      onSave({
-        user_id: selectedUser.id,
-        codigo_docente: docenteForm.codigo_docente,
-        departamento: docenteForm.departamento || null,
-        horas_maximas_semana: docenteForm.horas_maximas_semana,
-        activo: true, disponibilidades: [],
+      // Hacer el POST directamente aquí para manejar errores correctamente
+      const res = await fetch(BASE_DOCENTES, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          codigo_docente: docenteForm.codigo_docente.trim(),
+          departamento: docenteForm.departamento.trim() || null,
+          horas_maximas_semana: docenteForm.horas_maximas_semana,
+          disponibilidades: [],
+        }),
       });
-    } catch (e: any) { setSaveError(e.message ?? 'Error al guardar'); setSaving(false); }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = typeof err?.detail === 'string' ? err.detail : null;
+        if (res.status === 401) throw new Error('Tu sesión ha expirado. Vuelve a iniciar sesión.');
+        if (res.status === 403) throw new Error('No tienes permisos para crear docentes.');
+        if (res.status === 409) throw new Error(detail ?? `El código "${docenteForm.codigo_docente}" ya está en uso o el usuario ya está vinculado a otro docente.`);
+        if (res.status === 422) throw new Error(detail ?? 'Datos inválidos. Revisa el formulario.');
+        if (res.status >= 500) throw new Error(detail ?? 'Error del servidor. Intenta de nuevo.');
+        throw new Error(detail ?? `Error ${res.status} al crear el docente.`);
+      }
+
+      const docenteCreado: Docente = await res.json();
+      // Notificar al padre con el docente recién creado y cerrar
+      onSave(docenteCreado);
+    } catch (e: any) {
+      setSaveError(e.message ?? 'Error al guardar el docente.');
+      setSaving(false);
+    }
   };
 
-  /* Stepper */
+  /* ── Stepper ── */
   const Stepper = () => (
     <div className="flex items-center gap-2 px-6 pt-5 pb-3">
       <div className={`flex items-center gap-2 text-sm font-semibold ${step === 1 ? 'text-white' : 'text-emerald-400'}`}>
@@ -195,29 +279,30 @@ function CreateDocenteWizard({ onSave, onClose }:
     </div>
   );
 
-  /* ── Paso 1 */
+  /* ── Paso 1 ── */
   const renderStep1 = () => (
     <div className="p-6 space-y-4">
       {/* Tabs */}
       <div className="flex rounded-xl overflow-hidden border border-white/20 text-sm">
         <button type="button"
-          onClick={() => { setMode('search'); setSelectedUser(null); }}
+          onClick={() => { setMode('search'); setSelectedUser(null); setSearchQ(''); setSearchResults([]); }}
           className={`flex-1 py-2.5 font-semibold transition flex items-center justify-center gap-2 cursor-pointer
             ${mode === 'search' ? 'bg-white/20 text-white' : 'bg-transparent text-white/50 hover:bg-white/10'}`}>
-          <Search size={13} /> Buscar usuario
+          <Search size={13} /> Buscar usuario existente
         </button>
         <button type="button"
-          onClick={() => { setMode('create'); setSelectedUser(null); }}
+          onClick={() => { setMode('create'); setSelectedUser(null); setCreateError(null); }}
           className={`flex-1 py-2.5 font-semibold transition flex items-center justify-center gap-2 cursor-pointer
             ${mode === 'create' ? 'bg-white/20 text-white' : 'bg-transparent text-white/50 hover:bg-white/10'}`}>
           <UserPlus size={13} /> Registrar nuevo
         </button>
       </div>
 
+      {/* ── Tab: Buscar ── */}
       {mode === 'search' && (
         <div className="space-y-3">
           <p className="text-white/50 text-xs">
-            Busca usuarios con rol <strong className="text-white/70">Docente</strong> sin perfil de docente asignado.
+            Busca usuarios con rol <strong className="text-white/70">Docente</strong> que aún no tengan perfil docente asignado.
           </p>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
@@ -228,7 +313,7 @@ function CreateDocenteWizard({ onSave, onClose }:
           </div>
 
           {searchResults.length > 0 && (
-            <ul className="border border-white/20 rounded-xl overflow-hidden divide-y divide-white/10">
+            <ul className="border border-white/20 rounded-xl overflow-hidden divide-y divide-white/10 max-h-48 overflow-y-auto">
               {searchResults.map(u => (
                 <li key={u.id}>
                   <button type="button" onClick={() => setSelectedUser(u)}
@@ -246,7 +331,7 @@ function CreateDocenteWizard({ onSave, onClose }:
           )}
 
           {searchQ.length >= 2 && !searching && searchResults.length === 0 && (
-            <p className="text-white/40 text-sm text-center py-3">Sin resultados. Prueba registrando un nuevo usuario.</p>
+            <p className="text-white/40 text-sm text-center py-3">Sin resultados. Prueba la pestaña "Registrar nuevo".</p>
           )}
 
           {selectedUser && (
@@ -261,6 +346,7 @@ function CreateDocenteWizard({ onSave, onClose }:
         </div>
       )}
 
+      {/* ── Tab: Crear nuevo usuario ── */}
       {mode === 'create' && (
         <form id="create-user-form" onSubmit={handleCreateUser} className="space-y-4">
           {createError && (
@@ -292,7 +378,7 @@ function CreateDocenteWizard({ onSave, onClose }:
         </form>
       )}
 
-      {/* Footer */}
+      {/* Footer Paso 1 */}
       <div className="flex justify-between items-center pt-2 border-t border-white/15">
         <button type="button" onClick={onClose}
           className="px-5 py-2.5 rounded-xl border border-white/25 text-white/80 hover:bg-white/10 font-semibold text-sm transition cursor-pointer">
@@ -320,9 +406,10 @@ function CreateDocenteWizard({ onSave, onClose }:
     </div>
   );
 
-  /* ── Paso 2 */
+  /* ── Paso 2 ── */
   const renderStep2 = () => (
     <form onSubmit={handleSaveDocente} className="p-6 space-y-4">
+      {/* Usuario seleccionado */}
       {selectedUser && (
         <div className="flex items-center gap-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl px-4 py-3">
           <CheckCircle size={16} className="text-emerald-400 shrink-0" />
@@ -332,6 +419,7 @@ function CreateDocenteWizard({ onSave, onClose }:
           </span>
         </div>
       )}
+
       {saveError && (
         <div className="bg-red-500/20 border border-red-400/30 text-red-300 rounded-xl px-4 py-3 text-sm">{saveError}</div>
       )}
@@ -357,7 +445,7 @@ function CreateDocenteWizard({ onSave, onClose }:
       </div>
 
       <div className="flex justify-between items-center pt-2 border-t border-white/15">
-        <button type="button" onClick={() => setStep(1)}
+        <button type="button" onClick={() => { setStep(1); setSaveError(null); }}
           className="flex items-center gap-1 px-5 py-2.5 rounded-xl border border-white/25 text-white/80 hover:bg-white/10 font-semibold text-sm transition cursor-pointer">
           <ChevronLeft size={16} /> Atrás
         </button>
@@ -400,7 +488,7 @@ export default function ProfesoresModal({ isOpen, docente, onClose, onSave }: Pr
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/15
-                          sticky top-0 bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] rounded-t-2xl">
+                          sticky top-0 bg-[linear-gradient(135deg,#0a2a6e,#0d3494)] rounded-t-2xl z-10">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/15 border border-white/25">
                 <GraduationCap size={16} className="text-white" />
@@ -419,7 +507,7 @@ export default function ProfesoresModal({ isOpen, docente, onClose, onSave }: Pr
           {isEditing ? (
             <EditDocenteForm docente={docente!} onSave={onSave} onClose={onClose} />
           ) : (
-            <CreateDocenteWizard onSave={onSave} onClose={onClose} />
+            <CreateDocenteWizard isOpen={isOpen} onSave={onSave} onClose={onClose} />
           )}
         </Dialog.Content>
       </Dialog.Portal>
