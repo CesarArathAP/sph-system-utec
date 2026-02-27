@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { CalendarDays, X } from 'lucide-react';
 import type { Docente, Disponibilidad } from './logic/types';
+import { API_CONFIG } from '../../../services/config';
+
+interface Ocupacion {
+  id: number;
+  dia_semana: string;
+  hora_inicio: string;
+  hora_fin: string;
+  materia_nombre: string;
+  grupo_nombre: string;
+  aula_nombre: string;
+}
 
 interface DisponibilidadViewModalProps {
   isOpen:  boolean;
@@ -25,6 +36,9 @@ for (let h = 7; h < 21; h++) {
   TIME_SLOTS.push({ label: `${pad(h)}:00 – ${pad(h + 1)}:00`, inicio: `${pad(h)}:00:00` });
 }
 
+function getToken() { return localStorage.getItem('auth_token') ?? ''; }
+const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
+
 function buildSelectedSet(disponibilidades: Disponibilidad[]): Set<string> {
   return new Set(disponibilidades.map(d => `${d.dia_semana}|${d.hora_inicio}`));
 }
@@ -32,11 +46,70 @@ function buildSelectedSet(disponibilidades: Disponibilidad[]): Set<string> {
 /* ─── Componente ────────────────────────────────────────────── */
 export default function DisponibilidadViewModal({ isOpen, docente, onClose }: DisponibilidadViewModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ocupadas, setOcupadas] = useState<Set<string>>(new Set());
+  const [ocupacionesData, setOcupacionesData] = useState<Ocupacion[]>([]);
+  const [hoveredOcupacion, setHoveredOcupacion] = useState<Ocupacion | null>(null);
+  const [loading, setLoading]   = useState(false);
 
   useEffect(() => {
     if (!isOpen || !docente) return;
     setSelected(buildSelectedSet(docente.disponibilidades ?? []));
+    
+    // Cargar ocupaciones
+    loadOcupaciones();
   }, [isOpen, docente]);
+
+  const loadOcupaciones = async () => {
+    if (!docente?.id) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE}/${docente.id}/ocupaciones`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      
+      const ocupaciones: Ocupacion[] = await res.json();
+      setOcupacionesData(ocupaciones);
+      
+      const ocupadasSet = new Set<string>();
+      
+      // Construir set de ocupaciones - marcar TODOS los slots dentro del rango
+      for (const ocu of ocupaciones) {
+        const horaInicioObj = new Date(`2000-01-01T${ocu.hora_inicio}`);
+        const horaFinObj = new Date(`2000-01-01T${ocu.hora_fin}`);
+        
+        // Iterar a través de TODOS los TIME_SLOTS
+        for (const slot of TIME_SLOTS) {
+          const slotInicioObj = new Date(`2000-01-01T${slot.inicio}`);
+          
+          // Si el slot está dentro del rango [hora_inicio, hora_fin), marcarlo como ocupado
+          if (slotInicioObj >= horaInicioObj && slotInicioObj < horaFinObj) {
+            const key = `${ocu.dia_semana}|${slot.inicio}`;
+            ocupadasSet.add(key);
+          }
+        }
+      }
+      
+      setOcupadas(ocupadasSet);
+    } catch (e: any) {
+      console.error("Error loading ocupaciones:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Obtener la ocupación para un slot específico
+  const getOcupacionForSlot = (dia: string, slotInicio: string): Ocupacion | null => {
+    return ocupacionesData.find(ocu => {
+      const horaInicioObj = new Date(`2000-01-01T${ocu.hora_inicio}`);
+      const horaFinObj = new Date(`2000-01-01T${ocu.hora_fin}`);
+      const slotInicioObj = new Date(`2000-01-01T${slotInicio}`);
+      
+      return ocu.dia_semana === dia && 
+             slotInicioObj >= horaInicioObj && 
+             slotInicioObj < horaFinObj;
+    }) || null;
+  };
 
   const maxHoras      = docente?.horas_maximas_semana ?? 40;
   const horasSel      = selected.size;
@@ -104,7 +177,7 @@ export default function DisponibilidadViewModal({ isOpen, docente, onClose }: Di
           {/* ── Subtítulo ── */}
           <div className="px-6 py-2.5 border-b border-white/10 shrink-0">
             <p className="text-white/40 text-xs">
-              Los bloques marcados en <span className="text-blue-400 font-semibold">azul</span> indican disponibilidad horaria. Esta vista es de solo lectura.
+              Bloques en <span className="text-blue-400 font-semibold">azul</span> = disponibilidad. Bloques en <span className="text-yellow-400 font-semibold">amarillo</span> = ocupados por sesiones asignadas. Esta vista es de solo lectura.
             </p>
           </div>
 
@@ -130,17 +203,40 @@ export default function DisponibilidadViewModal({ isOpen, docente, onClose }: Di
                       {DAYS.map(day => {
                         const key = `${day.value}|${slot.inicio}`;
                         const isAvail = selected.has(key);
+                        const isOcupada = ocupadas.has(key);
+                        const ocupacion = isOcupada ? getOcupacionForSlot(day.value, slot.inicio) : null;
+                        
                         return (
-                          <td key={key} className="py-1.5 px-2 text-center">
+                          <td key={key} className="py-1.5 px-2 text-center relative">
                             <div
-                              className={`w-full py-1.5 rounded-lg text-xs font-semibold select-none
-                                ${isAvail
+                              onMouseEnter={() => ocupacion && setHoveredOcupacion(ocupacion)}
+                              onMouseLeave={() => setHoveredOcupacion(null)}
+                              className={`w-full py-1.5 rounded-lg text-xs font-semibold select-none cursor-${isOcupada ? 'help' : 'default'}
+                                ${isOcupada
+                                  ? 'bg-yellow-500/40 text-yellow-300 border border-yellow-400/50 hover:bg-yellow-500/50'
+                                  : isAvail
                                   ? 'bg-blue-500 text-white shadow-[0_2px_8px_rgba(59,130,246,0.5)]'
                                   : 'bg-white/5 text-white/15 border border-white/10'}`}
-                              title={isAvail ? 'Disponible' : 'No disponible'}
+                              title={isOcupada 
+                                ? 'Ocupado — sesión asignada' 
+                                : isAvail 
+                                ? 'Disponible' 
+                                : 'No disponible'}
                             >
-                              {isAvail ? '✓' : '–'}
+                              {isOcupada ? '⊗' : isAvail ? '✓' : '–'}
                             </div>
+                            
+                            {/* Tooltip con info de sesión */}
+                            {hoveredOcupacion && ocupacion === hoveredOcupacion && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                                <div className="bg-gray-900 border border-yellow-400/50 rounded-lg px-3 py-2 whitespace-nowrap text-xs shadow-lg">
+                                  <p className="text-yellow-300 font-semibold">{ocupacion.materia_nombre}</p>
+                                  <p className="text-white/80">Grupo: {ocupacion.grupo_nombre}</p>
+                                  <p className="text-white/80">Aula: {ocupacion.aula_nombre}</p>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 border-r border-b border-yellow-400/50 -rotate-45"></div>
+                                </div>
+                              </div>
+                            )}
                           </td>
                         );
                       })}
@@ -155,6 +251,10 @@ export default function DisponibilidadViewModal({ isOpen, docente, onClose }: Di
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-blue-500 rounded-md shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                 <span>Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-yellow-500/40 border border-yellow-400/50 rounded-md" />
+                <span>Ocupado (sesión asignada)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-white/10 border border-white/15 rounded-md" />
