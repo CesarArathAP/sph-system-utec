@@ -319,3 +319,61 @@ def replace_disponibilidad(
     db.refresh(docente)
 
     return docente
+
+
+def get_ocupaciones_docente(db: Session, docente_id: int) -> list[dict]:
+    """
+    Obtener las ocupaciones (horas asignadas en horarios activos) de un docente.
+    
+    Retorna los bloques de tiempo que ya están ocupados por horarios.
+    Esto se usa para mostrar en la vista de disponibilidad qué horas están ocupadas.
+    
+    Args:
+        db: Sesión de base de datos
+        docente_id: ID del docente
+        
+    Returns:
+        Lista de ocupaciones con detalles de la sesión:
+        [{"dia_semana": "lunes", "hora_inicio": "08:00:00", "hora_fin": "09:00:00", "grupo_id": 1, 
+          "materia_nombre": "Programación", "grupo_nombre": "1A", "aula_nombre": "A101"}]
+    """
+    from app.models import Horario, Asignacion, Materia, Grupo, Aula
+    
+    # Obtener todos los horarios ACTIVOS de este docente con información detallada
+    ocupaciones = (
+        db.query(
+            Horario.id,
+            Horario.dia_semana,
+            Horario.hora_inicio,
+            Horario.hora_fin,
+            Asignacion.grupo_id,
+            Materia.nombre.label("materia_nombre"),
+            Grupo.nombre.label("grupo_nombre"),
+            Aula.nombre.label("aula_nombre")
+        )
+        .join(Asignacion, Horario.asignacion_id == Asignacion.id)
+        .join(Materia, Asignacion.materia_id == Materia.id)
+        .join(Grupo, Asignacion.grupo_id == Grupo.id)
+        .join(Aula, Horario.aula_id == Aula.id)
+        .filter(
+            Asignacion.docente_id == docente_id,
+            Horario.activo == True
+        )
+        .all()
+    )
+    
+    # Convertir a lista de diccionarios
+    resultado = []
+    for ocu in ocupaciones:
+        resultado.append({
+            "id": ocu.id,
+            "dia_semana": ocu.dia_semana.value if hasattr(ocu.dia_semana, 'value') else str(ocu.dia_semana),
+            "hora_inicio": str(ocu.hora_inicio),
+            "hora_fin": str(ocu.hora_fin),
+            "grupo_id": ocu.grupo_id,
+            "materia_nombre": ocu.materia_nombre,
+            "grupo_nombre": ocu.grupo_nombre,
+            "aula_nombre": ocu.aula_nombre
+        })
+    
+    return resultado
