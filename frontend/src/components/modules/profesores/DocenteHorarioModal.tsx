@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { API_CONFIG } from '../../../services/config';
 import type { Docente } from './logic/types';
+import DisponibilidadModal from './DisponibilidadModal';
 
 /* ─── Tipos ─────────────────────────────────────────────────── */
 interface Horario {
@@ -83,6 +84,7 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [showDisponibilidad, setShowDisponibilidad] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !docente?.id) return;
@@ -117,8 +119,9 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
   const pct      = maxHoras ? Math.min((horasTotales / maxHoras) * 100, 100) : 0;
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={o => !o && onClose()}>
-      <Dialog.Portal>
+    <>
+      <Dialog.Root open={isOpen} onOpenChange={o => !o && onClose()}>
+        <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
         <Dialog.Content
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50
@@ -245,8 +248,17 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
 
             {/* Separador visual */}
             {!loading && docente && tieneHorarios && (
-              <div className="border-t border-white/10 pt-4">
-                <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider mb-4">Horarios de la semana</h3>
+              <div className="border-t border-white/10 pt-4 flex items-center justify-between">
+                <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider">Ver disponibilidad</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowDisponibilidad(true)}
+                  className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)] text-white text-sm font-semibold
+                             hover:shadow-[0_4px_16px_rgba(15,63,196,0.45)] hover:-translate-y-px transition-all duration-200 cursor-pointer"
+                >
+                  <Calendar size={14} className="inline mr-1.5" />
+                  Ver disponibilidad y sesiones
+                </button>
               </div>
             )}
 
@@ -279,78 +291,6 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
                 </div>
               </div>
             )}
-
-            {/* Grid de días */}
-            {!loading && !error && tieneHorarios && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {DIAS_ORDEN.map(dia => {
-                  const sesiones = porDia[dia];
-                  const tieneS   = sesiones.length > 0;
-                  return (
-                    <div key={dia} className="flex flex-col gap-2">
-                      {/* Cabecera día */}
-                      <div className={`text-center py-2 px-1 rounded-xl text-xs font-bold uppercase tracking-wider
-                        ${tieneS
-                          ? 'bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)] text-white shadow-[0_2px_12px_rgba(15,63,196,0.35)]'
-                          : 'bg-white/5 text-white/25 border border-white/10'}`}>
-                        {DIAS_LABEL[dia]}
-                        {tieneS && (
-                          <span className="block text-[10px] font-normal text-blue-200 mt-0.5">
-                            {sesiones.length} sesión{sesiones.length !== 1 ? 'es' : ''}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Sesiones */}
-                      {sesiones.length === 0 ? (
-                        <div className="flex-1 border border-dashed border-white/10 rounded-xl flex items-center justify-center min-h-[80px]">
-                          <span className="text-xs text-white/20">Libre</span>
-                        </div>
-                      ) : (
-                        sesiones.map(h => {
-                          const cardCls  = TIPO_CARD[h.tipo_sesion]  ?? 'bg-white/10 border-white/15 text-white/70';
-                          const badgeCls = TIPO_BADGE[h.tipo_sesion] ?? 'bg-white/10 text-white/50';
-                          return (
-                            <div key={h.id} className={`border rounded-xl p-3 space-y-1.5 ${cardCls}`}>
-                              {/* Hora */}
-                              <div className="flex items-center gap-1 text-xs font-bold">
-                                <Clock size={10} className="shrink-0 opacity-70" />
-                                {h.hora_inicio.slice(0, 5)} – {h.hora_fin.slice(0, 5)}
-                              </div>
-                              {/* Materia */}
-                              {h.asignacion?.materia && (
-                                <div className="flex items-start gap-1 text-[11px] leading-tight">
-                                  <BookOpen size={9} className="shrink-0 mt-0.5 opacity-70" />
-                                  <span className="font-semibold line-clamp-2">{h.asignacion.materia.nombre}</span>
-                                </div>
-                              )}
-                              {/* Grupo */}
-                              {h.asignacion?.grupo && (
-                                <div className="flex items-center gap-1 text-[11px] opacity-80">
-                                  <Users size={9} className="shrink-0" />
-                                  <span>{h.asignacion.grupo.nombre}</span>
-                                </div>
-                              )}
-                              {/* Aula */}
-                              {h.aula && (
-                                <div className="flex items-center gap-1 text-[11px] opacity-80">
-                                  <Building2 size={9} className="shrink-0" />
-                                  <span>{h.aula.codigo_aula}</span>
-                                </div>
-                              )}
-                              {/* Badge tipo */}
-                              <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeCls}`}>
-                                {h.tipo_sesion}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* ── Footer ── */}
@@ -370,5 +310,13 @@ export default function DocenteHorarioModal({ isOpen, docente, onClose }: Docent
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+
+    {/* Modal de Disponibilidad */}
+    <DisponibilidadModal
+      isOpen={showDisponibilidad}
+      docente={docente}
+      onClose={() => setShowDisponibilidad(false)}
+    />
+    </>
   );
 }
