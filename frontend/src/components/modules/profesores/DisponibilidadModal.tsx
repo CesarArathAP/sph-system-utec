@@ -1,8 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { RefreshCw, Trash2, CalendarDays, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Trash2, CalendarDays, X, AlertTriangle, CheckCircle2, Clock, BookOpen, Users, Building2 } from 'lucide-react';
 import type { Docente, Disponibilidad } from './logic/types';
 import { API_CONFIG } from '../../../services/config';
+
+interface Ocupacion {
+  id: number;
+  dia_semana: string;
+  hora_inicio: string;
+  hora_fin: string;
+  materia_nombre: string;
+  grupo_nombre: string;
+  aula_nombre: string;
+}
+
+interface Horario {
+  id: number;
+  dia_semana: string;
+  hora_inicio: string;
+  hora_fin: string;
+  tipo_sesion: string;
+  activo: boolean;
+  asignacion?: {
+    id: number;
+    ciclo_escolar: string;
+    materia?: { nombre: string; codigo: string };
+    grupo?:   { nombre: string; codigo_grupo: string };
+    docente?: { codigo_docente: string };
+  };
+  aula?: { nombre: string; codigo_aula: string };
+}
 
 interface DisponibilidadModalProps {
   isOpen:    boolean;
@@ -27,25 +54,139 @@ for (let h = 7; h < 21; h++) {
   TIME_SLOTS.push({ label: `${pad(h)}:00 – ${pad(h + 1)}:00`, inicio: `${pad(h)}:00:00`, fin: `${pad(h + 1)}:00:00` });
 }
 
+const DIAS_ORDEN = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+const DIAS_LABEL: Record<string, string> = {
+  lunes: 'Lun', martes: 'Mar', miercoles: 'Mié',
+  jueves: 'Jue', viernes: 'Vie', sabado: 'Sáb',
+};
+
+const TIPO_CARD: Record<string, string> = {
+  teorica:     'bg-blue-500/20   border-blue-400/30   text-blue-100',
+  practica:    'bg-emerald-500/20 border-emerald-400/30 text-emerald-100',
+  laboratorio: 'bg-violet-500/20  border-violet-400/30  text-violet-100',
+};
+const TIPO_BADGE: Record<string, string> = {
+  teorica:     'bg-blue-400/20   text-blue-300',
+  practica:    'bg-emerald-400/20 text-emerald-300',
+  laboratorio: 'bg-violet-400/20  text-violet-300',
+};
+
 /* ─── Helpers ───────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem('auth_token') ?? ''; }
 const BASE = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCENTES}`;
+const BASE_HORARIOS = API_CONFIG.BASE_URL;
 
 function buildSelectedSet(disponibilidades: Disponibilidad[]): Set<string> {
   return new Set(disponibilidades.map(d => `${d.dia_semana}|${d.hora_inicio}`));
 }
 
+async function fetchHorariosDocente(docenteId: number): Promise<Horario[]> {
+  const asigRes = await fetch(
+    `${BASE_HORARIOS}/asignaciones?docente_id=${docenteId}&page=1&page_size=100`,
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  );
+  if (!asigRes.ok) throw new Error(`Error fetching asignaciones: ${asigRes.status}`);
+  const asigData = await asigRes.json();
+  const asignaciones: { id: number }[] = asigData.asignaciones ?? [];
+  if (asignaciones.length === 0) return [];
+
+  const results = await Promise.all(
+    asignaciones.map(async a => {
+      const r = await fetch(
+        `${BASE_HORARIOS}/horarios?asignacion_id=${a.id}&page=1&page_size=50&activo=true`,
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      if (!r.ok) return [];
+      const d = await r.json();
+      return (d.horarios ?? []) as Horario[];
+    })
+  );
+  return results.flat();
+}
+
 /* ─── Componente ────────────────────────────────────────────── */
 export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved }: DisponibilidadModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [ocupadas, setOcupadas] = useState<Set<string>>(new Set());
+  const [ocupacionesData, setOcupacionesData] = useState<Ocupacion[]>([]);
+  const [hoveredOcupacion, setHoveredOcupacion] = useState<Ocupacion | null>(null);
   const [saving, setSaving]     = useState(false);
+  const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !docente) return;
     setSelected(buildSelectedSet(docente.disponibilidades ?? []));
     setError(null);
+    
+    // Cargar ocupaciones y horarios
+    loadOcupaciones();
+    loadHorarios();
   }, [isOpen, docente]);
+
+  const loadHorarios = async () => {
+    if (!docente?.id) return;
+    try {
+      const h = await fetchHorariosDocente(docente.id);
+      setHorarios(h);
+    } catch (e: any) {
+      console.error("Error loading horarios:", e);
+    }
+  };
+
+  const loadOcupaciones = async () => {
+    if (!docente?.id) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE}/${docente.id}/ocupaciones`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      
+      const ocupaciones: Ocupacion[] = await res.json();
+      setOcupacionesData(ocupaciones);
+      
+      const ocupadasSet = new Set<string>();
+      
+      // Construir set de ocupaciones - marcar TODOS los slots dentro del rango
+      for (const ocu of ocupaciones) {
+        const horaInicioObj = new Date(`2000-01-01T${ocu.hora_inicio}`);
+        const horaFinObj = new Date(`2000-01-01T${ocu.hora_fin}`);
+        
+        // Iterar a través de TODOS los TIME_SLOTS
+        for (const slot of TIME_SLOTS) {
+          const slotInicioObj = new Date(`2000-01-01T${slot.inicio}`);
+          
+          // Si el slot está dentro del rango [hora_inicio, hora_fin), marcarlo como ocupado
+          if (slotInicioObj >= horaInicioObj && slotInicioObj < horaFinObj) {
+            const key = `${ocu.dia_semana}|${slot.inicio}`;
+            ocupadasSet.add(key);
+          }
+        }
+      }
+      
+      setOcupadas(ocupadasSet);
+    } catch (e: any) {
+      // No mostrar error si falla cargar ocupaciones, solo continuar sin ellas
+      console.error("Error loading ocupaciones:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Obtener la ocupación para un slot específico
+  const getOcupacionForSlot = (dia: string, slotInicio: string): Ocupacion | null => {
+    return ocupacionesData.find(ocu => {
+      const horaInicioObj = new Date(`2000-01-01T${ocu.hora_inicio}`);
+      const horaFinObj = new Date(`2000-01-01T${ocu.hora_fin}`);
+      const slotInicioObj = new Date(`2000-01-01T${slotInicio}`);
+      
+      return ocu.dia_semana === dia && 
+             slotInicioObj >= horaInicioObj && 
+             slotInicioObj < horaFinObj;
+    }) || null;
+  };
 
   const toggleSlot = (day: string, inicio: string) => {
     const key = `${day}|${inicio}`;
@@ -226,19 +367,43 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
                       {DAYS.map(day => {
                         const key = `${day.value}|${slot.inicio}`;
                         const isSel = selected.has(key);
+                        const isOcupada = ocupadas.has(key);
+                        const ocupacion = isOcupada ? getOcupacionForSlot(day.value, slot.inicio) : null;
+                        
                         return (
-                          <td key={key} className="py-1.5 px-2 text-center">
+                          <td key={key} className="py-1.5 px-2 text-center relative">
                             <button
                               type="button"
                               onClick={() => toggleSlot(day.value, slot.inicio)}
+                              disabled={isOcupada}
+                              onMouseEnter={() => ocupacion && setHoveredOcupacion(ocupacion)}
+                              onMouseLeave={() => setHoveredOcupacion(null)}
                               className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer
-                                ${isSel
+                                ${isOcupada
+                                  ? 'bg-yellow-500/40 text-yellow-300 border border-yellow-400/50 cursor-not-allowed hover:bg-yellow-500/50'
+                                  : isSel
                                   ? 'bg-blue-500 text-white shadow-[0_2px_8px_rgba(59,130,246,0.5)] scale-105'
                                   : 'bg-white/5 text-white/20 hover:bg-white/15 hover:text-white/60 border border-white/10'}`}
-                              title={isSel ? 'Disponible — clic para quitar' : 'No disponible — clic para marcar'}
+                              title={isOcupada 
+                                ? 'Ocupado — esta sesión ya está asignada' 
+                                : isSel 
+                                ? 'Disponible — clic para quitar' 
+                                : 'No disponible — clic para marcar'}
                             >
-                              {isSel ? '✓' : '–'}
+                              {isOcupada ? '⊗' : isSel ? '✓' : '–'}
                             </button>
+                            
+                            {/* Tooltip con info de sesión */}
+                            {hoveredOcupacion && ocupacion === hoveredOcupacion && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                                <div className="bg-gray-900 border border-yellow-400/50 rounded-lg px-3 py-2 whitespace-nowrap text-xs shadow-lg">
+                                  <p className="text-yellow-300 font-semibold">{ocupacion.materia_nombre}</p>
+                                  <p className="text-white/80">Grupo: {ocupacion.grupo_nombre}</p>
+                                  <p className="text-white/80">Aula: {ocupacion.aula_nombre}</p>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 border-r border-b border-yellow-400/50 -rotate-45"></div>
+                                </div>
+                              </div>
+                            )}
                           </td>
                         );
                       })}
@@ -249,16 +414,99 @@ export default function DisponibilidadModal({ isOpen, docente, onClose, onSaved 
             </div>
 
             {/* Leyenda */}
-            <div className="mt-4 flex gap-5 text-xs text-white/40">
+            <div className="mt-4 flex gap-5 text-xs text-white/40 flex-wrap">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-blue-500 rounded-md shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                 <span>Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-yellow-500/40 border border-yellow-400/50 rounded-md" />
+                <span>Ocupado (sesión asignada)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-white/10 border border-white/15 rounded-md" />
                 <span>No disponible</span>
               </div>
             </div>
+
+            {/* SECCIÓN DE HORARIOS */}
+            {horarios.length > 0 && (
+              <>
+                <div className="border-t border-white/10 mt-6 pt-6">
+                  <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider mb-4">Horarios de la semana</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {DIAS_ORDEN.map(dia => {
+                      const sesionesDelDia = horarios.filter(h => h.dia_semana?.toLowerCase() === dia);
+                      const tieneS = sesionesDelDia.length > 0;
+                      
+                      return (
+                        <div key={dia} className="flex flex-col gap-2">
+                          {/* Cabecera día */}
+                          <div className={`text-center py-2 px-1 rounded-xl text-xs font-bold uppercase tracking-wider
+                            ${tieneS
+                              ? 'bg-[linear-gradient(135deg,#1e56d9,#0d3ab0)] text-white shadow-[0_2px_12px_rgba(15,63,196,0.35)]'
+                              : 'bg-white/5 text-white/25 border border-white/10'}`}>
+                            {DIAS_LABEL[dia]}
+                            {tieneS && (
+                              <span className="block text-[10px] font-normal text-blue-200 mt-0.5">
+                                {sesionesDelDia.length} sesión{sesionesDelDia.length !== 1 ? 'es' : ''}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Sesiones */}
+                          {sesionesDelDia.length === 0 ? (
+                            <div className="flex-1 border border-dashed border-white/10 rounded-xl flex items-center justify-center min-h-[80px]">
+                              <span className="text-xs text-white/20">Libre</span>
+                            </div>
+                          ) : (
+                            sesionesDelDia.map(h => {
+                              const cardCls  = TIPO_CARD[h.tipo_sesion]  ?? 'bg-white/10 border-white/15 text-white/70';
+                              const badgeCls = TIPO_BADGE[h.tipo_sesion] ?? 'bg-white/10 text-white/50';
+                              
+                              return (
+                                <div key={h.id} className={`border rounded-xl p-3 space-y-1.5 ${cardCls}`}>
+                                  {/* Hora */}
+                                  <div className="flex items-center gap-1 text-xs font-bold">
+                                    <Clock size={10} className="shrink-0 opacity-70" />
+                                    {h.hora_inicio.slice(0, 5)} – {h.hora_fin.slice(0, 5)}
+                                  </div>
+                                  {/* Materia */}
+                                  {h.asignacion?.materia && (
+                                    <div className="flex items-start gap-1 text-[11px] leading-tight">
+                                      <BookOpen size={9} className="shrink-0 mt-0.5 opacity-70" />
+                                      <span className="font-semibold line-clamp-2">{h.asignacion.materia.nombre}</span>
+                                    </div>
+                                  )}
+                                  {/* Grupo */}
+                                  {h.asignacion?.grupo && (
+                                    <div className="flex items-center gap-1 text-[11px] opacity-80">
+                                      <Users size={9} className="shrink-0" />
+                                      <span>{h.asignacion.grupo.nombre}</span>
+                                    </div>
+                                  )}
+                                  {/* Aula */}
+                                  {h.aula && (
+                                    <div className="flex items-center gap-1 text-[11px] opacity-80">
+                                      <Building2 size={9} className="shrink-0" />
+                                      <span>{h.aula.codigo_aula}</span>
+                                    </div>
+                                  )}
+                                  {/* Badge tipo */}
+                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeCls}`}>
+                                    {h.tipo_sesion}
+                                  </span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── Footer ── */}
