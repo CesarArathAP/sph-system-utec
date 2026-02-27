@@ -229,14 +229,18 @@ def check_docente_disponibilidad(
     dia_semana: str,
     hora_inicio: time,
     hora_fin: time,
+    allow_no_disponibilidad: bool = False,
 ) -> None:
     """
     Verifica que el docente tenga disponibilidad registrada que cubra
     completamente el bloque [hora_inicio, hora_fin) del día dado.
 
     Si el docente tiene CUALQUIER registro de disponibilidad, entonces solo
-    puede enseñar en los rangos registrados. Si NO tiene ningún registro,
-    se asume que está disponible siempre.
+    puede enseñar en los rangos registrados. 
+    
+    Si NO tiene ningún registro de disponibilidad:
+    - Si allow_no_disponibilidad=False (default): Lanza excepción (más seguro)
+    - Si allow_no_disponibilidad=True: Permite (para generador automático)
 
     Raises:
         HTTPException 422 con mensaje descriptivo y los slots disponibles
@@ -249,9 +253,35 @@ def check_docente_disponibilidad(
         .count()
     )
     
-    # Si NO tiene ningún registro de disponibilidad, permitir (estaba disponible siempre)
+    # Obtener datos del docente para mensajes de error
+    docente = db.query(Docente).filter(Docente.id == docente_id).first()
+    docente_nombre = "el docente"
+    if docente and docente.user:
+        docente_nombre = f"{docente.user.nombre} {docente.user.apellido}"
+    
+    # Si NO tiene ningún registro de disponibilidad
     if total_disponibilidad == 0:
-        return
+        if not allow_no_disponibilidad:
+            # Por defecto, NO permitir crear horarios sin disponibilidad registrada
+            # Para evitar conflictos y asegurar que se configuren adecuadamente
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "mensaje": (
+                        f"No se puede asignar horario: {docente_nombre} no tiene bloques "
+                        f"de disponibilidad registrados en el sistema."
+                    ),
+                    "disponibilidad_docente": {
+                        "bloques_registrados": 0,
+                        "sugerencia": (
+                            f"Antes de asignar clases a {docente_nombre}, es necesario registrar sus bloques "
+                            f"de disponibilidad en el módulo de Docentes. "
+                            f"Especifica qué días y horarios está disponible para impartir clases."
+                        ),
+                    },
+                },
+            )
+        return  # allow_no_disponibilidad=True, permitir para generador automático
     
     # Si TIENE registros, buscar específicamente para ese día
     slots_dia = (

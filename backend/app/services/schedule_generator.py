@@ -5,8 +5,9 @@ Dado un ciclo escolar, recorre todas las Asignaciones (docente ↔ materia ↔ g
 y crea las Horarios correspondientes de forma automática, respetando:
 
   1. Disponibilidad declarada del docente (tabla DisponibilidadDocente).
-     • Si el docente NO tiene ningún registro ➜ se asume disponible siempre.
-     • Si tiene registros ➜ el slot debe quedar cubierto por al menos uno.
+     • OBLIGATORIO: Cada docente DEBE tener registros de disponibilidad.
+     • Si el docente NO tiene bloques registrados → la generación FALLA con advertencia.
+     • Si tiene registros → el slot debe quedar cubierto por al menos uno.
 
   2. Horas máximas semanales (Docente.horas_maximas_semana).
      El conteo es incremental: se actualiza después de cada sesión creada
@@ -21,11 +22,14 @@ y crea las Horarios correspondientes de forma automática, respetando:
   5. Sin colisión de grupo: sin solapamiento con otros Horarios activos
      del mismo grupo en el mismo día/hora.
 
-IMPORTANTE: los horarios se insertan directamente (db.add / db.commit) sin
-pasar por horario_service.create_horario, porque ese método llama a
-check_docente_disponibilidad y check_horas_maximas_docente que lanzan
-HTTPException. Esas excepciones serían absorbidas silenciosamente por el
-bloque except/continue del generador, produciendo 0 horarios creados.
+⚠️ CAMBIO IMPORTANTE (Refuerzo de Validación):
+   - Ahora se requiere que TODO docente tenga disponibilidad registrada ANTES de generar
+   - Esto previene conflictos y asegura que los horarios sean válidos
+   - Si algún docente NO tiene bloques de disponibilidad, la generación retorna un error
+     con la lista de docentes afectados y sugerencias
+
+NOTA: Los horarios se insertan directamente (db.add / db.commit) sin pasar por
+horario_service.create_horario para evitar excepciones HTTP en bucles.
 """
 from datetime import time
 from typing import Optional
