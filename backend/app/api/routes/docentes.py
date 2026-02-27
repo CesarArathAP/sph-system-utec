@@ -149,3 +149,31 @@ def replace_disponibilidad(
     Para dejar al docente sin disponibilidad, enviar una lista vacía `[]`.
     """
     return docente_service.replace_disponibilidad(db, docente_id, disponibilidades)
+
+@router.get("/{docente_id}/ocupaciones", response_model=list[dict])
+def get_ocupaciones_docente(
+    docente_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_coordinador)
+):
+    """
+    Obtener las ocupaciones (horas ocupadas en horarios) de un docente.
+    
+    Requiere rol de coordinador o admin.
+    
+    Retorna una lista de bloques horarios que ya están asignados a este docente.
+    Se usa para mostrar en el modal de disponibilidad qué franjas horarias están ocupadas.
+    
+    Ejemplo de respuesta:
+    ```
+    [
+      {
+        "dia_semana": "lunes",
+        "hora_inicio": "08:00:00",
+        "hora_fin": "09:00:00",
+        "grupo_id": 1
+      }
+    ]
+    ```
+    """
+    return docente_service.get_ocupaciones_docente(db, docente_id)
