@@ -942,3 +942,58 @@ def get_schedule_summary(db: Session, ciclo_escolar: str) -> dict:
         "conflictos_pendientes": total_c,
         "cobertura":             cobertura,
     }
+
+
+# ─── Utilidad: Encontrar docentes sin disponibilidad ─────────────────────────
+
+def find_docentes_without_disponibilidad(db: Session) -> list[dict]:
+    """
+    Busca todos los docentes ACTIVOS que NO tienen disponibilidad registrada.
+
+    Retorna:
+        list[dict] con estructura:
+        {
+            "docente_id": int,
+            "codigo": str,
+            "nombre": str,
+            "departamento": str,
+            "horas_maximas": int
+        }
+    """
+    docentes = (
+        db.query(Docente)
+        .options(joinedload(Docente.user))
+        .filter(Docente.activo == True)
+        .all()
+    )
+
+    docentes_sin_disp = []
+
+    for doc in docentes:
+        slots_count = (
+            db.query(DisponibilidadDocente)
+            .filter(DisponibilidadDocente.docente_id == doc.id)
+            .count()
+        )
+
+        if slots_count == 0:
+            docentes_sin_disp.append({
+                "docente_id": doc.id,
+                "codigo": doc.codigo_docente,
+                "nombre": f"{doc.user.nombre} {doc.user.apellido}" if doc.user else "N/A",
+                "departamento": doc.departamento,
+                "horas_maximas": doc.horas_maximas_semana,
+            })
+
+    return docentes_sin_disp
+
+
+# ─── Alias: nombre alternativo para compatibilidad ──────────────────────────
+
+def generate_schedules(db: Session, ciclo_escolar: str,
+                       clear_existing: bool = False) -> dict:
+    """
+    Alias para generate_schedule() con nombre plural.
+    Generado para compatibilidad con código que usa este nombre.
+    """
+    return generate_schedule(db, ciclo_escolar, clear_existing)
