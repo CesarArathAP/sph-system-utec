@@ -1,13 +1,65 @@
 """
-Router de autenticación.
-Endpoints para login, registro y gestión de tokens.
+Rutas de autenticación.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
+from app.services import auth_service
+from app.models.user import User
+from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
 
-# TODO: Implementar endpoints de autenticación
-# @router.post("/login")
-# @router.post("/register")
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register(
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Registrar un nuevo usuario.
+    
+    - **email**: Email único del usuario
+    - **password**: Contraseña (mínimo 8 caracteres)
+    - **nombre**: Nombre completo del usuario
+    - **rol**: Rol del usuario (admin, coordinador, docente, estudiante)
+    """
+    return auth_service.create_user(db, user_data)
+
+
+@router.post("/login", response_model=Token)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    """
+    Iniciar sesión y obtener token JWT.
+    
+    Usa el formulario OAuth2 estándar:
+    - **username**: Email del usuario
+    - **password**: Contraseña del usuario
+    
+    Returns:
+        Token JWT para autenticación
+    """
+    return auth_service.login_user(db, form_data.username, form_data.password)
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtener información del usuario autenticado.
+    
+    Requiere autenticación con token JWT en el header:
+    Authorization: Bearer <token>
+    
+    Returns:
+        Información del usuario actual
+    """
+    return current_user
 # @router.post("/refresh")

@@ -1,0 +1,11 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { DashboardLayout } from "../../../components/layout";
+import { AuthGuard } from "../../../components/Auth";
+---
+
+<BaseLayout title="Inicio - SPH System">
+    <AuthGuard requireAuth={true} client:load>
+        <DashboardLayout section="inicio" client:load />
+    </AuthGuard>
+</BaseLayout>
