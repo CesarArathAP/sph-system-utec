@@ -1,0 +1,30 @@
+# Configuración de Netlify para despliegue de frontend Astro
+
+[build]
+  # Directorio raíz del proyecto (donde está package.json)
+  base = "frontend"
+  
+  # Comando para compilar
+  command = "npm run build"
+  
+  # Directorio de salida (generado por Astro)
+  publish = "dist"
+
+[build.environment]
+  # Node version a usar
+  NODE_VERSION = "20"
+
+# Redirecciones para SPA (enviará todo a index.html)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de seguridad
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"

@@ -1,6 +1,7 @@
 /* Configuración de la API */
 
-const API_BASE_URL = 'http://localhost:8000/api/v1'; /* const API_BASE_URL = 'http://#:8000/api/v1'; */
+// En desarrollo: usa localhost | En producción (Netlify): usa variable de ambiente
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
