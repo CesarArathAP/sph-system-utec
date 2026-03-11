@@ -304,3 +304,14 @@ password=securepassword
 
 #### `DELETE /api/v1/schedule/{ciclo}` (Clear Schedule)
 **Body:** (Vacío)
+
+
+Docker
+
+```bash
+# Construir la imagen y poner tu usuario de docker
+docker build -t [TU_USUARIO]/sph-backend:latest .
+
+# Subir la imagen
+docker push [TU_USUARIO]/sph-backend:latest
+```
