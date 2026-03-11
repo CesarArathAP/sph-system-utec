@@ -304,4 +304,3 @@ password=securepassword
 
 #### `DELETE /api/v1/schedule/{ciclo}` (Clear Schedule)
 **Body:** (Vacío)
->>>>>>> develop
