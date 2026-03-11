@@ -1,7 +1,7 @@
 /* Configuración de la API */
 
 // En desarrollo: usa localhost | En producción (Netlify): usa variable de ambiente
-const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'http://localhost:8080/api/v1'; /* const API_BASE_URL = 'http://#:8000/api/v1'; en la imagen de docker se corre en el puerto 8080 y localmente en el 8000*/
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
