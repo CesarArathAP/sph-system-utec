@@ -32,7 +32,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     nombre = Column(String(100), nullable=False)
     apellido = Column(String(100), nullable=False)
-    rol = Column(SQLEnum(RolEnum), nullable=False, index=True)
+    rol = Column(SQLEnum(RolEnum, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     activo = Column(Boolean, default=True, nullable=False)
     current_token = Column(String(32), nullable=True, index=True)  # Token de sesión activo
     token_expires_at = Column(DateTime, nullable=True)  # Fecha de expiración del token
