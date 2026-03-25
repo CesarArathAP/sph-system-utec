@@ -373,6 +373,115 @@ Próximas versiones: Sí, con aprobación.
 | Horarios generables | 130+ |
 | Ciclo actual | 2026-1 |
 
+
+## 📅 Plan de Desarrollo por Sprints
+
+## 🚀 Sprint 001 - Base del sistema y estructura general
+
+**Descripción:**  
+Establecer la base técnica del sistema y permitir el registro de información académica básica.
+
+**Actividades principales:**
+- Definir estructura general de la aplicación
+- Maquetar pantallas base: Docentes, Materias, Aulas
+- Formularios de registro y edición
+- Validaciones básicas de entrada
+- Definir modelo de datos inicial
+- Crear entidades: Docente, Materia, Aula
+- Implementar operaciones CRUD básicas
+- Configurar conexión a base de datos
+
+
+
+## ⚙️ Sprint 002 - Primer flujo funcional completo
+
+**Descripción:**  
+Preparar la información necesaria para la generación de horarios.
+
+**Actividades principales:**
+- Pantalla para definir disponibilidad docente
+- Componentes de selección de horarios
+- Mejora de navegación entre módulos
+- Lógica para almacenar disponibilidad docente
+- Endpoints para consulta de disponibilidad
+
+
+
+## 🧠 Sprint 003 - Operaciones esenciales
+
+**Descripción:**  
+Generar automáticamente un horario académico sin conflictos críticos.
+
+**Actividades principales:**
+- Indicadores de proceso (cargando, generado)
+- Mensajes de error o éxito
+- Algoritmo básico de generación de horarios
+- Aplicación de restricciones principales
+- Detección de conflictos simples
+
+
+
+## 📊 Sprint 004 - Expansión funcional
+
+**Descripción:**  
+Hacer el horario entendible, consultable y usable.
+
+**Actividades principales:**
+- Vista de horario por:
+  - grupo
+  - docente
+  - aula
+- Diseño de cuadrícula semanal
+- Filtros básicos de visualización
+- Servicios para consulta de horarios
+- Estructuración de datos para visualización
+- Optimización de respuestas
+
+
+
+## 🔄 Sprint 005 - Integración de procesos
+
+**Descripción:**  
+Permitir ajustes manuales al horario generado.
+
+**Actividades principales:**
+- Interfaz de edición manual del horario
+- Acciones de mover, reasignar o eliminar clases
+- Confirmaciones de cambios
+- Lógica de modificación manual del horario
+- Revalidación de restricciones
+- Actualización persistente del horario
+
+
+
+## 🛠️ Sprint 006 - Estabilización y refinamiento
+
+**Descripción:**  
+Garantizar estabilidad, coherencia y persistencia del sistema.
+
+**Actividades principales:**
+- Manejo de errores
+- Mejoras de usabilidad
+- Ajustes visuales finales
+- Guardado de versiones del horario
+- Corrección de errores detectados
+- Pruebas funcionales de endpoints
+
+
+
+## 🎯 Sprint 007 - Cierre del MVP y demostración
+
+**Descripción:**  
+Preparar el MVP para presentación y evaluación.
+
+**Actividades principales:**
+- Flujo completo sin errores visibles
+- Preparación de demo funcional
+- Ajustes finales de interfaz
+- Revisión completa del flujo de datos
+- Limpieza de código
+- Documentación técnica básica
+
 ---
 
 **Última actualización:** 2026-03-02  
